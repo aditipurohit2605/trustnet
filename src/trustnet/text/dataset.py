@@ -75,18 +75,20 @@ class TrustNetTextDataset(Dataset):
         input_mode: str = "claim_only",
         max_length: int = 256,
         max_doc_chars: int = 600,
+        top_k_evidence: int = 5,
         seed: int = 42,
         is_test: bool = False,
     ):
         """
         Args:
-            split_path: Path to the split JSONL file (train, val, or test).
+            split_path: Path to the split JSONL file (train, val, or test), or retrieved_<split>.jsonl.
             tokenizer: Hugging Face PreTrainedTokenizer instance.
             label_list: List of valid Verdict string values from config.
             corpus_path: Path to corpus_v1.jsonl (required if input_mode == 'claim_evidence').
-            input_mode: 'claim_only' or 'claim_evidence'.
+            input_mode: 'claim_only', 'claim_evidence', or 'claim_retrieved'.
             max_length: Maximum combined token sequence length.
             max_doc_chars: Character limit per evidence document before concatenation.
+            top_k_evidence: Maximum number of retrieved evidence passages to include (claim_retrieved mode).
             seed: RNG seed for deterministic NEI evidence document selection.
             is_test: Set to True when loading the test split (for safety checks).
         """
@@ -96,11 +98,19 @@ class TrustNetTextDataset(Dataset):
         self.input_mode = input_mode.lower()
         self.max_length = max_length
         self.max_doc_chars = max_doc_chars
+        self.top_k_evidence = top_k_evidence
         self.seed = seed
         self.is_test = is_test
 
-        if self.input_mode not in ("claim_only", "claim_evidence"):
-            raise ValueError(f"Unknown input_mode: '{input_mode}'. Must be 'claim_only' or 'claim_evidence'.")
+        valid_modes = ("claim_only", "claim_evidence", "claim_retrieved")
+        if self.input_mode not in valid_modes:
+            raise ValueError(f"Unknown input_mode: '{input_mode}'. Must be one of {valid_modes}.")
+
+        # For claim_retrieved mode, auto-detect retrieved_<split>.jsonl if split_path points to standard split
+        if self.input_mode == "claim_retrieved":
+            retrieved_candidate = self.split_path.parent / f"retrieved_{self.split_path.name}"
+            if not self.split_path.name.startswith("retrieved_") and retrieved_candidate.is_file():
+                self.split_path = retrieved_candidate
 
         # Build class index mappings
         self.label2id, self.id2label = build_label_mapping(label_list)
@@ -177,6 +187,29 @@ class TrustNetTextDataset(Dataset):
                         return_attention_mask=True,
                     )
                     input_text_repr = claim_text
+                elif self.input_mode == "claim_retrieved":
+                    # 'claim_retrieved' mode: build input from the top-k retrieved passages
+                    raw_evidence = record.get("evidence") or []
+                    evidence_texts: List[str] = []
+                    for ev in raw_evidence[:self.top_k_evidence]:
+                        if isinstance(ev, dict):
+                            t = str(ev.get("text", "")).strip()
+                        else:
+                            t = str(ev).strip()
+                        if t:
+                            evidence_texts.append(t[:self.max_doc_chars])
+                    evidence_str = " \n ".join(evidence_texts)
+
+                    # Tokenize pair: (claim, retrieved_evidence) with truncation='only_second'
+                    encoding = self.tokenizer(
+                        claim_text,
+                        evidence_str,
+                        truncation="only_second",
+                        max_length=self.max_length,
+                        padding=False,
+                        return_attention_mask=True,
+                    )
+                    input_text_repr = f"{claim_text} [SEP] {evidence_str}" if evidence_str else claim_text
                 else:
                     # 'claim_evidence' mode
                     evidence_doc_ids = record.get("evidence_doc_ids") or record.get("gold_evidence_ids") or []

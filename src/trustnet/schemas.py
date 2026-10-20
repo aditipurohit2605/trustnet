@@ -62,6 +62,8 @@ class Evidence(BaseModel):
     text: str
     source: Optional[str] = None
     source_type: Optional[str] = None
+    score: Optional[float] = None
+    passage_id: Optional[str] = None
 
 
 class ClaimReport(BaseModel):

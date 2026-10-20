@@ -1,0 +1,32 @@
+# Stage 3 Retrieval Configuration
+# Dense and reranker model identifiers from Hugging Face
+dense_model: "BAAI/bge-m3"
+reranker_model: "BAAI/bge-reranker-v2-m3"
+
+# Passage chunking parameters (sliding window over sentences)
+chunk_size_sentences: 3
+chunk_stride: 2
+
+# Candidate pool sizes for individual retrievers
+bm25_top_k: 100
+dense_top_k: 100
+
+# Reciprocal Rank Fusion (RRF) parameters
+rrf_k: 60
+fused_top_k: 50
+
+# Cross-encoder reranking final selection count
+final_top_k: 5
+
+# Inference batch sizes
+embed_batch_size: 32
+rerank_batch_size: 16
+
+# Reproducibility seed
+seed: 42
+
+# Default paths
+corpus_path: "data/corpus/corpus_v1.jsonl"
+passages_path: "outputs/stage3/passages.jsonl"
+index_dir: "outputs/stage3/index"
+cache_embeddings: true
