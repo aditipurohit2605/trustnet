@@ -1,0 +1,25 @@
+# Stage 5 Vision Module Configuration
+# CLIP Model settings (OpenCLIP)
+clip_model: "ViT-B-32"
+pretrained: "laion2b_s34b_b79k"
+text_encoder_mode: "clip"  # "clip" (direct CLIP tokenization) or "translate_first"
+
+# OCR settings (EasyOCR)
+ocr_languages:
+  - "en"
+  - "hi"
+ocr_min_confidence: 0.3
+
+# Image Captioning (Lazy loaded, disabled by default)
+caption_model: null  # e.g., "Salesforce/blip-image-captioning-base" or null
+
+# Image Bank Index & Reuse Detection
+phash_size: 8
+phash_match_threshold: 10
+embedding_match_threshold: 0.85
+image_bank_dir: "data/image_bank"
+
+# Hardware and precision
+device: "auto"  # "auto", "cuda", or "cpu"
+fp16: true
+seed: 42

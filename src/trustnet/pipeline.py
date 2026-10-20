@@ -82,3 +82,91 @@ def run_retrieval_for_message(
         "claim_retrievals": claim_retrievals,
         "error": extraction_result.error,
     }
+
+
+def run_extraction_for_image_text(
+    image: Any,
+    extractor: Optional[ClaimExtractor] = None,
+    analyzer: Optional[Any] = None,
+    ocr_reader: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Extracts text from an image via OCR and feeds it through the Stage 4 ClaimExtractor.
+    All extracted claims are explicitly marked with metadata={'from_image_text': True}.
+
+    Args:
+        image: In-memory image (PIL Image, numpy array, bytes) or file path.
+        extractor: Configured Stage 4 ClaimExtractor instance (created if omitted).
+        analyzer: Optional ImageAnalyzer instance.
+        ocr_reader: Optional OCRReader instance.
+
+    Returns:
+        Structured dictionary containing:
+        - "ocr_text": Raw OCR text extracted from the image.
+        - "ocr_confidence": Mean detection confidence score.
+        - "ocr_language": Detected language ("en", "hi", "unknown").
+        - "claims": All extracted ExtractedClaim instances tagged with metadata={'from_image_text': True}.
+        - "checkable_claims": Checkable ExtractedClaim instances tagged with metadata={'from_image_text': True}.
+        - "from_image_text": True flag indicating visual provenance.
+    """
+    ocr_text = ""
+    ocr_conf = 0.0
+    ocr_lang = "unknown"
+
+    # Step 1: Run OCR extraction
+    if analyzer is not None:
+        signals = analyzer.analyze(image)
+        ocr_text = signals.ocr_text or ""
+        ocr_conf = signals.ocr_confidence or 0.0
+        ocr_lang = signals.ocr_language or "unknown"
+    elif ocr_reader is not None:
+        ocr_text, ocr_conf, ocr_lang = ocr_reader.read(image)
+    else:
+        # Lazy import to avoid unnecessary overhead when vision is not used
+        from trustnet.vision.ocr import OCRReader
+        reader = OCRReader()
+        ocr_text, ocr_conf, ocr_lang = reader.read(image)
+
+    # Step 2: Handle empty OCR text
+    if not ocr_text or not ocr_text.strip():
+        logger.info("No OCR text detected on the image; returning zero claims.")
+        return {
+            "ocr_text": "",
+            "ocr_confidence": 0.0,
+            "ocr_language": "unknown",
+            "claims": [],
+            "checkable_claims": [],
+            "from_image_text": True,
+            "error": None,
+        }
+
+    # Step 3: Extract factual claims from the OCR text
+    if extractor is None:
+        extractor = ClaimExtractor()
+
+    logger.info(f"Extracting claims from OCR text ({len(ocr_text)} characters)...")
+    extraction_result = extractor.extract(ocr_text)
+
+    # Step 4: Tag every extracted claim with provenance 'from_image_text': True
+    tagged_claims: List[ExtractedClaim] = []
+    for claim in extraction_result.claims:
+        claim.metadata["from_image_text"] = True
+        tagged_claims.append(claim)
+
+    checkable_claims = [c for c in tagged_claims if c.checkable]
+    logger.info(
+        f"Extracted {len(tagged_claims)} claims from image text "
+        f"({len(checkable_claims)} checkable, tagged 'from_image_text')."
+    )
+
+    return {
+        "ocr_text": ocr_text,
+        "ocr_confidence": round(float(ocr_conf), 4),
+        "ocr_language": ocr_lang,
+        "claims": tagged_claims,
+        "checkable_claims": checkable_claims,
+        "source_mentions": extraction_result.source_mentions,
+        "from_image_text": True,
+        "error": extraction_result.error,
+    }
+

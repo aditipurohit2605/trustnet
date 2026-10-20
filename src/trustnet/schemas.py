@@ -73,6 +73,8 @@ class ExtractedClaim(BaseModel):
     checkable: bool
     source_span: str
     language: str = "en"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
 
     def to_claim(self) -> Claim:
         """
@@ -151,3 +153,33 @@ class CorpusDocument(BaseModel):
     doc_id: str
     text: str
     title: Optional[str] = None
+
+
+class ReuseMatch(BaseModel):
+    """Represents a matched duplicate or near-duplicate image from the image bank."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    bank_id: str
+    phash_distance: int
+    embedding_similarity: float
+    known_context: Optional[str] = None
+    source: Optional[str] = None
+
+
+class ImageSignals(BaseModel):
+    """
+    Extracted visual and provenance signals for an image.
+    All fields are optional with defaults to ensure partial or graceful degradation.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    ocr_text: Optional[str] = None
+    ocr_confidence: Optional[float] = None
+    ocr_language: Optional[str] = None
+    caption: Optional[str] = None
+    clip_similarity: Optional[float] = None
+    mismatch_score: Optional[float] = None  # 0 to 1, higher = more mismatched
+    reuse_matches: List[ReuseMatch] = Field(default_factory=list)
+    exif_summary: Dict[str, Any] = Field(default_factory=dict)
+    quality_flags: List[str] = Field(default_factory=list)
+

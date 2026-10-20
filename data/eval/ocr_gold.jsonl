@@ -1,0 +1,8 @@
+{"id": "ocr_en_1", "text": "The dam reservoir levels are currently normal and safe.", "language": "en", "image_path": "data/eval/images/ocr_en_1.png"}
+{"id": "ocr_en_2", "text": "Official notice: please do not spread unverified rumors.", "language": "en", "image_path": "data/eval/images/ocr_en_2.png"}
+{"id": "ocr_en_3", "text": "The emergency response team has been dispatched.", "language": "en", "image_path": "data/eval/images/ocr_en_3.png"}
+{"id": "ocr_en_4", "text": "Weather department predicts light rain tomorrow morning.", "language": "en", "image_path": "data/eval/images/ocr_en_4.png"}
+{"id": "ocr_hi_1", "text": "बाढ़ की स्थिति पूरी तरह से नियंत्रण में है", "language": "hi", "image_path": "data/eval/images/ocr_hi_1.png"}
+{"id": "ocr_hi_2", "text": "आधिकारिक सूचना: किसी भी अफवाह पर ध्यान न दें", "language": "hi", "image_path": "data/eval/images/ocr_hi_2.png"}
+{"id": "ocr_hi_3", "text": "सुरक्षा हेल्पलाइन नंबर चालू है", "language": "hi", "image_path": "data/eval/images/ocr_hi_3.png"}
+{"id": "ocr_hi_4", "text": "मौसम विभाग ने हल्की बारिश का अनुमान लगाया है", "language": "hi", "image_path": "data/eval/images/ocr_hi_4.png"}
