@@ -5,7 +5,7 @@ Core schemas and data models for the TrustNet package.
 from enum import Enum
 import hashlib
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Verdict(str, Enum):
@@ -106,6 +106,71 @@ class ExtractionResult(BaseModel):
     error: Optional[str] = None
 
 
+class ShareAdvice(str, Enum):
+    """Actionable sharing advice derived from reasoning, calibration, and conflict signals."""
+    SAFE_TO_SHARE = "safe_to_share"
+    SHARE_WITH_CAUTION = "share_with_caution"
+    DO_NOT_SHARE_AS_CONFIRMED = "do_not_share_as_confirmed"
+
+
+class SourceWeight(BaseModel):
+    """Reliability weighting attribution for an evidence source type."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_type: str
+    weight: float
+    rationale: str = ""
+
+
+class ConflictInfo(BaseModel):
+    """Detection of contradictory or conflicting evidence across authoritative sources."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    has_conflict: bool = False
+    supporting: List["Evidence"] = Field(default_factory=list)
+    contradicting: List["Evidence"] = Field(default_factory=list)
+    explanation: str = ""
+
+
+class TemporalInfo(BaseModel):
+    """Temporal freshness analysis and staleness flags comparing claim to evidence."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    claim_time_expressions: List[str] = Field(default_factory=list)
+    newest_evidence_date: Optional[str] = None
+    oldest_evidence_date: Optional[str] = None
+    is_stale: bool = False
+    explanation: str = ""
+
+
+class ManipulationTag(BaseModel):
+    """Tagging of psychological, rhetorical, or manipulative tactics in message text."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    span: str
+
+
+class Gap(BaseModel):
+    """Specific verification gap identified in the evidence base."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str
+    description: str
+    how_to_check: str
+
+
+class Counterfactual(BaseModel):
+    """Hypothetical input perturbation scenario testing model decision sensitivity."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    change_description: str
+    original_verdict: Union[Verdict, str]
+    new_verdict: Union[Verdict, str]
+    flipped: bool
+
+
 class Evidence(BaseModel):
     """Represents an evidence document or snippet supporting/refuting a claim."""
     model_config = ConfigDict(populate_by_name=True)
@@ -116,6 +181,9 @@ class Evidence(BaseModel):
     source_type: Optional[str] = None
     score: Optional[float] = None
     passage_id: Optional[str] = None
+    date: Optional[str] = None
+    url: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ClaimReport(BaseModel):
@@ -133,7 +201,37 @@ class ClaimReport(BaseModel):
     raw_probabilities: Optional[Dict[str, float]] = Field(default=None, description="Uncalibrated model output probability distribution.")
     calibrated_probabilities: Optional[Dict[str, float]] = Field(default=None, description="Calibrated probability distribution for dashboard and reporting.")
     abstention_reason: Optional[str] = Field(default=None, description="Explanation if system abstains.")
-    gaps: List[str] = Field(default_factory=list)
+    gaps: List[Gap] = Field(default_factory=list)
+
+    # Stage 8 Reasoning Layer Extensions
+    source_weights: Optional[List[SourceWeight]] = None
+    conflict: Optional[ConflictInfo] = None
+    temporal: Optional[TemporalInfo] = None
+    manipulation: Optional[List[ManipulationTag]] = None
+    counterfactuals: Optional[List[Counterfactual]] = None
+    share_advice: Optional[ShareAdvice] = None
+    reasoning_notes: List[str] = Field(default_factory=list)
+
+    @field_validator("gaps", mode="before")
+    @classmethod
+    def migrate_gaps(cls, v: Any) -> Any:
+        """
+        Migrates legacy list[str] gap entries to list[Gap] records,
+        preserving backward compatibility.
+        """
+        if isinstance(v, list):
+            migrated = []
+            for item in v:
+                if isinstance(item, str):
+                    migrated.append(Gap(code="general_note", description=item, how_to_check="Verify claim evidence directly."))
+                elif isinstance(item, dict):
+                    migrated.append(Gap(**item))
+                elif isinstance(item, Gap):
+                    migrated.append(item)
+                else:
+                    migrated.append(Gap(code="note", description=str(item), how_to_check="Verify claim evidence directly."))
+            return migrated
+        return v
 
 
 class ClaimExample(BaseModel):

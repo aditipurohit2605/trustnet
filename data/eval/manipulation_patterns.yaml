@@ -1,0 +1,67 @@
+# Manipulation and Rhetorical Tactics Catalog for TrustNet Stage 8
+patterns:
+  - name: "urgent_forward_plea"
+    description: "Explicit appeals prompting the reader to forward or spread the message immediately to friends/groups."
+    examples:
+      - "Forward to all your groups right now!"
+      - "Share before this message is taken down!"
+      - "Jaldi se sabko share karo"
+    indicators:
+      - "forward to"
+      - "share before"
+      - "share with everyone"
+      - "share with"
+      - "share with all"
+      - "share karo"
+      - "sabko bhejo"
+      - "viral karo"
+
+  - name: "false_authority_appeal"
+    description: "Invoking reputable organizations, doctors, or unnamed insiders without links or verifiable citations."
+    examples:
+      - "NASA has officially confirmed the cosmic ray alert tonight."
+      - "Senior doctor from AIIMS warns everyone to avoid tap water."
+      - "My uncle in the ministry just leaked this secret order."
+    indicators:
+      - "nasa confirmed"
+      - "who declared"
+      - "who officially declared"
+      - "doctor from aiims"
+      - "ministry insider"
+      - "sources inside the department"
+
+  - name: "emotional_outrage_bait"
+    description: "Sensationalized phrasing designed to provoke anger, disgust, or moral outrage."
+    examples:
+      - "Shameful betrayal of our cultural values!"
+      - "Shocking scam exposed, politicians looting poor people!"
+    indicators:
+      - "shameful"
+      - "shocking betrayal"
+      - "open your eyes"
+      - "wake up"
+      - "looting us"
+
+  - name: "conspiracy_framing"
+    description: "Framing standard events as covert plots or claiming mainstream media is suppressing truth."
+    examples:
+      - "Mainstream media is completely silent on this explosive revelation!"
+      - "The truth they don't want you to see."
+    indicators:
+      - "media is silent"
+      - "media won't show"
+      - "what they hide"
+      - "secret plot"
+      - "ancient gold reserves"
+      - "temple ruins"
+
+  - name: "clickbait_urgency"
+    description: "Creating artificial panic or emergency to compel uncritical consumption."
+    examples:
+      - "URGENT ALERT: Shut off your phones tonight between 12 AM and 3 AM!"
+      - "Danger warning! Do not eat this food starting tomorrow!"
+    indicators:
+      - "urgent alert"
+      - "emergency warning"
+      - "khatra"
+      - "dhyan se padhein"

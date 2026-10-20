@@ -7,10 +7,11 @@ corpus using the Stage 3 multi-mode retriever.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 from trustnet.retrieval.retriever import Retriever
-from trustnet.schemas import Claim, Evidence, ExtractedClaim
+from trustnet.schemas import Claim, ClaimReport, Evidence, ExtractedClaim
 from trustnet.text.extraction.extractor import ClaimExtractor
 
 logger = logging.getLogger(__name__)
@@ -171,25 +172,201 @@ def run_extraction_for_image_text(
     }
 
 
+def apply_reasoning_to_report(
+    report: ClaimReport,
+    reasoning_config: Optional[Union[str, Path, Dict[str, Any]]] = None,
+    image_signals: Optional[Any] = None,
+    source_mentions: Optional[List[Any]] = None,
+    original_message: Optional[str] = None,
+) -> ClaimReport:
+    """
+    Executes all enabled Stage 8 reasoning components on a ClaimReport:
+    - Source Reliability Weighting
+    - Conflict Detection
+    - Temporal Freshness Analysis
+    - Manipulation Tagging
+    - Evidence Gap Analysis
+    - Counterfactual Sensitivity Generation
+    - Actionable Share Advice
+
+    Guarantees:
+    - Strict verdict and confidence immutability: the underlying classification is never modified.
+    - Fault-tolerant execution: failure in any reasoning component logs a warning and leaves
+      that specific field empty without interrupting the pipeline.
+    """
+    import yaml
+    cfg: Dict[str, Any] = {}
+    if reasoning_config is None:
+        default_cfg_path = Path("configs/stage8_reasoning.yaml")
+        if default_cfg_path.exists():
+            with open(default_cfg_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+    elif isinstance(reasoning_config, (str, Path)):
+        if Path(reasoning_config).exists():
+            with open(reasoning_config, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+    elif isinstance(reasoning_config, dict):
+        cfg = reasoning_config
+
+    enabled = cfg.get("enabled", {})
+    notes: List[str] = list(report.reasoning_notes or [])
+
+    # 1. Source Reliability
+    if enabled.get("source_reliability", True):
+        try:
+            from trustnet.reasoning.source_reliability import SourceReliabilityAssigner
+            s_assigner = SourceReliabilityAssigner(
+                config_path=cfg.get("source_reliability_path", "configs/source_reliability.yaml")
+            )
+            weights, s_summary = s_assigner.assign_weights(report.evidence)
+            report.source_weights = weights
+            if s_summary.get("unknown_sources"):
+                notes.append(f"SourceReliability: Unverified source categories detected: {s_summary['unknown_sources']}")
+        except Exception as e:
+            logger.warning(f"Reasoning layer [source_reliability] failed: {e}")
+
+    # 2. Conflict Detection
+    if enabled.get("conflict", True):
+        try:
+            from trustnet.reasoning.conflict import ConflictDetector
+            detector = ConflictDetector(
+                conflict_min_weight=cfg.get("conflict_min_weight", 0.50),
+                confidence_threshold=cfg.get("conflict_confidence_threshold", 0.45),
+            )
+            conflict_info = detector.detect_conflicts(report.claim.text, report.evidence)
+            report.conflict = conflict_info
+            if conflict_info.has_conflict:
+                notes.append(f"ConflictDetector: {conflict_info.explanation}")
+        except Exception as e:
+            logger.warning(f"Reasoning layer [conflict] failed: {e}")
+
+    # 3. Temporal Freshness
+    if enabled.get("temporal", True):
+        try:
+            from trustnet.reasoning.temporal import TemporalAnalyzer
+            t_analyzer = TemporalAnalyzer(stale_days=cfg.get("stale_days", 90))
+            t_info = t_analyzer.analyze(report.claim.text, report.evidence)
+            report.temporal = t_info
+            if t_info.is_stale:
+                notes.append(f"TemporalAnalyzer: Evidence flagged stale - {t_info.explanation}")
+        except Exception as e:
+            logger.warning(f"Reasoning layer [temporal] failed: {e}")
+
+    # 4. Manipulation Tagging
+    if enabled.get("manipulation", True):
+        try:
+            from trustnet.reasoning.manipulation import ManipulationTagger
+            m_tagger = ManipulationTagger(
+                patterns_path=cfg.get("manipulation_patterns_path", "data/eval/manipulation_patterns.yaml"),
+                model_name=cfg.get("manipulation_model", "llama3.2:1b"),
+            )
+            # Tag either original message or claim text
+            text_to_tag = original_message if original_message else report.claim.text
+            tags = m_tagger.tag(text_to_tag)
+            report.manipulation = tags
+            if tags:
+                tag_names = [t.name for t in tags]
+                notes.append(f"ManipulationTagger: Detected rhetorical tactics {tag_names}")
+        except Exception as e:
+            logger.warning(f"Reasoning layer [manipulation] failed: {e}")
+
+    # 5. Gap Analysis
+    if enabled.get("gaps", True):
+        try:
+            from trustnet.reasoning.gaps import GapAnalyzer
+            g_analyzer = GapAnalyzer(
+                templates_path=cfg.get("gap_templates_path", "data/eval/gap_templates.yaml")
+            )
+            gaps = g_analyzer.analyze(
+                claim_text=report.claim.text,
+                evidence_list=report.evidence,
+                conflict_info=report.conflict,
+                temporal_info=report.temporal,
+                image_signals=image_signals,
+                source_mentions=source_mentions,
+            )
+            # Combine newly identified gaps with existing legacy notes
+            report.gaps = gaps
+            if gaps:
+                gap_codes = [g.code for g in gaps]
+                notes.append(f"GapAnalyzer: Identified verification gaps {gap_codes}")
+        except Exception as e:
+            logger.warning(f"Reasoning layer [gaps] failed: {e}")
+
+    # 6. Counterfactual Sensitivity
+    if enabled.get("counterfactual", True):
+        try:
+            from trustnet.reasoning.counterfactual import CounterfactualGenerator
+            c_gen = CounterfactualGenerator(max_counterfactuals=cfg.get("max_counterfactuals", 5))
+            dummy_rec = {
+                "claim_id": report.claim.id,
+                "claim_text": report.claim.text,
+                "dataset": "pipeline",
+                "text_logits": [0.0, 0.0, 0.0],
+                "text_pooled": [0.0] * 32,
+                "retrieval_features": {
+                    "top1_score": report.evidence[0].score if report.evidence and report.evidence[0].score else 1.0,
+                    "top1_top2_gap": 0.5,
+                    "num_passages_above_threshold": len(report.evidence),
+                    "mean_score": 1.0,
+                    "source_type_government": sum(1 for e in report.evidence if (e.source_type or "").lower() == "government"),
+                },
+                "image_features": {
+                    "image_present": 1 if image_signals else 0,
+                    "mismatch_score": getattr(image_signals, "mismatch_score", 0.0) if image_signals else 0.0,
+                },
+            }
+            c_list = c_gen.generate(dummy_rec, original_verdict=report.verdict)
+            report.counterfactuals = c_list
+        except Exception as e:
+            logger.warning(f"Reasoning layer [counterfactual] failed: {e}")
+
+    # 7. Actionable Share Advice
+    if enabled.get("share_advice", True):
+        try:
+            from trustnet.reasoning.share_advice import determine_share_advice
+            advice, advice_rationale = determine_share_advice(
+                verdict=report.verdict,
+                confidence=report.confidence,
+                abstained=report.abstained,
+                conflict=report.conflict,
+                temporal=report.temporal,
+            )
+            report.share_advice = advice
+            notes.append(f"ShareAdvice: {advice.value} - {advice_rationale}")
+        except Exception as e:
+            logger.warning(f"Reasoning layer [share_advice] failed: {e}")
+
+    report.reasoning_notes = notes
+    return report
+
+
 def verify_claim(
     claim: Claim,
     evidence: Optional[List[Evidence]] = None,
     image_path: Optional[str] = None,
     predictor: Optional[Any] = None,
-) -> Any:
+    enable_reasoning: bool = True,
+    reasoning_config: Optional[Any] = None,
+) -> ClaimReport:
     """
-    Verifies a single Claim instance using calibrated multimodal prediction and abstention.
-    Preserves the original claim text and returns a ClaimReport with abstention fields.
+    Verifies a single Claim instance using calibrated multimodal prediction and abstention,
+    enriched with the Stage 8 reasoning layer.
     """
     if predictor is None:
         from trustnet.fusion.predict import MultimodalPredictor
-        predictor = MultimodalPredictor()
+        predictor = MultimodalPredictor.from_artifacts()
 
-    return predictor.predict_claim_report(
+    report = predictor.predict_claim_report(
         claim=claim,
         evidence=evidence or [],
         image_path=image_path,
     )
+
+    if enable_reasoning:
+        report = apply_reasoning_to_report(report, reasoning_config=reasoning_config)
+
+    return report
 
 
 def run_full_verification_pipeline(
@@ -200,17 +377,20 @@ def run_full_verification_pipeline(
     predictor: Optional[Any] = None,
     retrieval_mode: str = "hybrid_rerank",
     top_k: int = 5,
+    enable_reasoning: bool = True,
+    reasoning_config: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Full end-to-end verification pipeline:
-    1. Extracts checkable claims from input text.
+    1. Extracts checkable claims and source mentions from input text.
     2. Retrieves top-k evidence documents per claim.
     3. Runs calibrated multimodal prediction and abstention.
-    4. Returns structured results containing a ClaimReport for each checkable claim.
+    4. Executes the Stage 8 reasoning layer (conflict, freshness, gaps, share advice).
+    5. Returns structured results containing enriched ClaimReport instances.
     """
     if predictor is None:
         from trustnet.fusion.predict import MultimodalPredictor
-        predictor = MultimodalPredictor()
+        predictor = MultimodalPredictor.from_artifacts()
 
     retrieval_result = run_retrieval_for_message(
         text=text,
@@ -220,7 +400,9 @@ def run_full_verification_pipeline(
         top_k=top_k,
     )
 
-    reports = []
+    reports: List[ClaimReport] = []
+    source_mentions = retrieval_result.get("source_mentions", [])
+
     for item in retrieval_result.get("claim_retrievals", []):
         claim_obj = item["claim"]
         evidence_items = item["evidence"]
@@ -230,6 +412,15 @@ def run_full_verification_pipeline(
             evidence=evidence_items,
             image_path=image_path,
         )
+
+        if enable_reasoning:
+            report = apply_reasoning_to_report(
+                report,
+                reasoning_config=reasoning_config,
+                source_mentions=source_mentions,
+                original_message=text,
+            )
+
         reports.append(report)
 
     return {
@@ -238,5 +429,9 @@ def run_full_verification_pipeline(
         "reports": reports,
         "extraction": retrieval_result,
     }
+
+
+# Backward-compatible alias
+run_full_pipeline = run_full_verification_pipeline
 
 

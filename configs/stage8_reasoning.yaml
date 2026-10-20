@@ -1,0 +1,23 @@
+# TrustNet Stage 8: Reasoning Layer Configuration
+seed: 42
+
+source_reliability_path: "configs/source_reliability.yaml"
+stale_days: 90
+conflict_min_weight: 0.50
+conflict_margin: 0.10
+conflict_confidence_threshold: 0.45
+manipulation_model: "llama3.2:1b"
+max_counterfactuals: 5
+
+enabled:
+  source_reliability: true
+  conflict: true
+  temporal: true
+  manipulation: true
+  gaps: true
+  counterfactual: true
+  share_advice: true
+
+gap_templates_path: "data/eval/gap_templates.yaml"
+manipulation_patterns_path: "data/eval/manipulation_patterns.yaml"
+output_dir: "outputs/stage8"

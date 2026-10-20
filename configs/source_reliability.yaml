@@ -1,0 +1,33 @@
+# TrustNet Stage 8: Source Type Reliability Weights and Rationales
+version: "1.0"
+default_weight: 0.20
+unknown_rationale: "Unverified or unclassified source type; assigned conservative baseline weight."
+
+sources:
+  government:
+    weight: 1.00
+    rationale: "Official government gazettes, ministries, statutory regulators, and public health agencies."
+  wire:
+    weight: 0.95
+    rationale: "Major independent news agencies and syndicates with rigorous editorial standards (PTI, Reuters, AP)."
+  academic:
+    weight: 0.90
+    rationale: "Peer-reviewed scientific journals, research institutes, and university faculty publications."
+  established_news:
+    weight: 0.85
+    rationale: "Accredited mainstream national and international news outlets with published correction policies."
+  news:
+    weight: 0.75
+    rationale: "General digital news outlets, regional reporting, and accredited trade publications."
+  corpus_passage:
+    weight: 0.60
+    rationale: "Pre-indexed domain corpus documents with verified provenance."
+  social_media:
+    weight: 0.30
+    rationale: "Unverified user-generated social media posts, forwards, and microblog assertions."
+  user_submission:
+    weight: 0.20
+    rationale: "Crowdsourced user tip or forwarded query without editorial verification."
+  other:
+    weight: 0.25
+    rationale: "General unclassified web content, personal blogs, or niche forums."

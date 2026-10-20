@@ -1,0 +1,46 @@
+# Verification Evidence Gap Templates for TrustNet Stage 8
+gaps:
+  no_primary_source:
+    code: "no_primary_source"
+    description: "No primary official, government, or wire agency evidence passage was retrieved."
+    how_to_check: "Cross-reference with official ministry websites (e.g., PIB, Gov.in) or established news wire feeds (PTI, ANI, Reuters)."
+
+  no_dated_evidence:
+    code: "no_dated_evidence"
+    description: "None of the retrieved evidence passages contain verifiable publication or event timestamps."
+    how_to_check: "Inspect official press release archives or news article bylines to determine when the reported event occurred."
+
+  stale_evidence:
+    code: "stale_evidence"
+    description: "The most recent retrieved evidence is older than the staleness threshold relative to the claim."
+    how_to_check: "Search for developments published within the last 30 to 90 days to confirm whether the situation has changed."
+
+  no_location_confirmation:
+    code: "no_location_confirmation"
+    description: "The claim specifies a geographical location or jurisdiction that is not corroborated by any retrieved evidence."
+    how_to_check: "Check local district administration notices, regional municipal bulletins, or local verified journalists."
+
+  conflicting_sources:
+    code: "conflicting_sources"
+    description: "Reputable sources present direct contradictions regarding the core factual proposition."
+    how_to_check: "Compare the specific statements and evidence cited by both supporting and refuting sources to evaluate conflicting claims."
+
+  image_origin_unknown:
+    code: "image_origin_unknown"
+    description: "The attached visual asset has no known provenance, reverse image matches, or original EXIF metadata."
+    how_to_check: "Perform a reverse image search across Google Images, TinEye, or Yandex to trace the original context and upload date."
+
+  image_text_mismatch_high:
+    code: "image_text_mismatch_high"
+    description: "Significant semantic mismatch detected between the image contents and the accompanied textual claim."
+    how_to_check: "Verify if an authentic archival image has been repurposed with misleading out-of-context captioning."
+
+  source_unnamed:
+    code: "source_unnamed"
+    description: "The claim attributes information to an unnamed, anonymous, or vague insider source."
+    how_to_check: "Look for on-the-record statements attributed to named authorized spokespersons rather than anonymous tips."
+
+  low_retrieval_scores:
+    code: "low_retrieval_scores"
+    description: "Retrieved evidence has weak semantic relevance scores, indicating insufficient corpus coverage."
+    how_to_check: "Broaden keyword search queries across external independent knowledge bases and public archives."
