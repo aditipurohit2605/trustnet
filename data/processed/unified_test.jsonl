@@ -1,0 +1,3 @@
+{"claim_id": "test_001", "claim_text": "The ozone layer recovery is progressing globally according to atmospheric data.", "dataset": "fever", "label4": "verified", "image_path": null}
+{"claim_id": "test_002", "claim_text": "Northern municipal reservoir dam water levels are critically beyond historic thresholds.", "dataset": "fever", "label4": "contradicted", "image_path": null}
+{"claim_id": "test_003", "claim_text": "Electric vehicle subsidies in small townships caused grid destabilization in winter.", "dataset": "fever", "label4": "insufficient_evidence", "image_path": null}

@@ -1,0 +1,3 @@
+{"claim_id": "train_002", "claim_text": "Depletion of stratospheric ozone is accelerating rapidly worldwide.", "dataset": "fever", "label4": "contradicted", "image_path": null}
+{"claim_id": "train_006", "claim_text": "A massive geothermal plant was commissioned in the capital district last year.", "dataset": "fever", "label4": "insufficient_evidence", "image_path": null}
+{"claim_id": "train_001", "claim_text": "The ozone layer is recovering following global emission reductions.", "dataset": "fever", "label4": "verified", "image_path": null}

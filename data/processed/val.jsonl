@@ -1,0 +1,4 @@
+{"id": "val_001", "claim": "Satellite monitoring shows positive signs of ozone healing over polar areas.", "verdict": "verified", "evidence_doc_ids": ["doc_001"]}
+{"id": "val_002", "claim": "Reservoir water levels behind the northern dam are reported at emergency collapse levels.", "verdict": "contradicted", "evidence_doc_ids": ["doc_004"]}
+{"id": "val_003", "claim": "An international committee banned the sale of natural mineral water in European markets.", "verdict": "insufficient_evidence", "evidence_doc_ids": []}
+{"id": "val_004", "claim": "Controlled studies demonstrated memory boosts in adults consuming concentrated multivitamin packs.", "verdict": "contradicted", "evidence_doc_ids": ["doc_005"]}

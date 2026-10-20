@@ -1,0 +1,4 @@
+{"claim_id": "val_001", "claim_text": "Satellite monitoring shows positive signs of ozone healing over polar areas.", "dataset": "fever", "label4": "verified", "image_path": null}
+{"claim_id": "val_002", "claim_text": "Reservoir water levels behind the northern dam are reported at emergency collapse levels.", "dataset": "fever", "label4": "contradicted", "image_path": null}
+{"claim_id": "val_003", "claim_text": "An international committee banned the sale of natural mineral water in European markets.", "dataset": "fever", "label4": "insufficient_evidence", "image_path": null}
+{"claim_id": "val_004", "claim_text": "Controlled studies demonstrated memory boosts in adults consuming concentrated multivitamin packs.", "dataset": "fever", "label4": "contradicted", "image_path": null}

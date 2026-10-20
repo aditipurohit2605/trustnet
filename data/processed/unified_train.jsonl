@@ -1,0 +1,8 @@
+{"claim_id": "train_001", "claim_text": "The ozone layer is recovering following global emission reductions.", "dataset": "fever", "label4": "verified", "image_path": null}
+{"claim_id": "train_002", "claim_text": "Depletion of stratospheric ozone is accelerating rapidly worldwide.", "dataset": "fever", "label4": "contradicted", "image_path": null}
+{"claim_id": "train_003", "claim_text": "Pediatric vaccines reduced severe respiratory illnesses in monitored cities.", "dataset": "fever", "label4": "verified", "image_path": null}
+{"claim_id": "train_004", "claim_text": "Vaccination efforts had no effect on child hospitalization rates.", "dataset": "fever", "label4": "contradicted", "image_path": null}
+{"claim_id": "train_005", "claim_text": "Solar energy parity with fossil fuel generation was observed during peak hours.", "dataset": "fever", "label4": "verified", "image_path": null}
+{"claim_id": "train_006", "claim_text": "A massive geothermal plant was commissioned in the capital district last year.", "dataset": "fever", "label4": "insufficient_evidence", "image_path": null}
+{"claim_id": "train_007", "claim_text": "Megadoses of vitamins produce dramatic cognitive enhancements in healthy adults.", "dataset": "fever", "label4": "contradicted", "image_path": null}
+{"claim_id": "train_008", "claim_text": "An offshore wind farm began powering municipal water treatment plants.", "dataset": "fever", "label4": "insufficient_evidence", "image_path": null}

@@ -1,0 +1,26 @@
+{
+  "description": "TrustNet Dataset Manifest",
+  "seed": 42,
+  "splits": {
+    "train_text": {
+      "file": "processed/train_text.jsonl",
+      "count": 5,
+      "sha256": "e2f440b29ba54da95be3926fb0dba568e5af7d4f1593ab0408f07046bc187b45"
+    },
+    "train_fusion": {
+      "file": "processed/train_fusion.jsonl",
+      "count": 3,
+      "sha256": "4c15af0f2fb41223725221b2923f23adaa1bc3dd3a8c560b7016d61e54c37661"
+    },
+    "val": {
+      "file": "processed/val.jsonl",
+      "count": 4,
+      "sha256": "79e6a6812a3827762d23328579b74ed723322c1b132d51d955596d67a17dac52"
+    },
+    "test": {
+      "file": "processed/test.jsonl",
+      "count": 3,
+      "sha256": "c5ed7665f11e555139f96916541ab5310faee03ac7747098883223b9548387c2"
+    }
+  }
+}

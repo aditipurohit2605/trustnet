@@ -1,0 +1,50 @@
+# Stage 6 Multimodal Fusion Configuration
+
+# Feature group toggles
+feature_groups:
+  text_logits: true
+  text_pooled: true
+  retrieval_features: true
+  image_features: true
+  image_clip_embedding: true
+
+# Modality Dropout Settings
+modality_dropout_image: 0.3
+modality_dropout_evidence: 0.3
+
+# LightGBM Classifier Parameters
+lightgbm:
+  objective: "multiclass"
+  num_class: 3
+  metric: "multi_logloss"
+  boosting_type: "gbdt"
+  learning_rate: 0.05
+  num_leaves: 15
+  max_depth: 4
+  min_data_in_leaf: 1
+  n_estimators: 100
+  feature_fraction: 0.9
+  seed: 42
+  early_stopping_rounds: 15
+
+# PyTorch MLP Fusion Head Parameters
+mlp:
+  hidden_sizes: [128, 64]
+  dropout: 0.2
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs: 30
+  batch_size: 4
+  early_stopping_patience: 5
+
+# Sampling & Class Imbalance Strategy
+class_weights_mode: "balanced"  # "balanced" or null
+dataset_balanced_sampling: false
+
+# Reproducibility seed
+seed: 42
+
+# Paths
+cache_dir: "outputs/stage6/cache"
+output_dir: "outputs/stage6"
+model_save_dir: "outputs/stage6/models"

@@ -14,8 +14,11 @@ data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/*.jsonl
 data/corpus/*
 !data/corpus/.gitkeep
+!data/corpus/*.jsonl
+
 
 # Model checkpoints and outputs
 outputs/

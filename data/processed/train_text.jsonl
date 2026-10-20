@@ -1,0 +1,5 @@
+{"id": "train_005", "claim": "Solar energy parity with fossil fuel generation was observed during peak hours.", "verdict": "verified", "evidence_doc_ids": ["doc_003"]}
+{"id": "train_004", "claim": "Vaccination efforts had no effect on child hospitalization rates.", "verdict": "contradicted", "evidence_doc_ids": ["doc_002"]}
+{"id": "train_003", "claim": "Pediatric vaccines reduced severe respiratory illnesses in monitored cities.", "verdict": "verified", "evidence_doc_ids": ["doc_002"]}
+{"id": "train_008", "claim": "An offshore wind farm began powering municipal water treatment plants.", "verdict": "insufficient_evidence", "evidence_doc_ids": []}
+{"id": "train_007", "claim": "Megadoses of vitamins produce dramatic cognitive enhancements in healthy adults.", "verdict": "contradicted", "evidence_doc_ids": ["doc_005"]}
