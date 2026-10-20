@@ -3,6 +3,7 @@ Core schemas and data models for the TrustNet package.
 """
 
 from enum import Enum
+import hashlib
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -52,6 +53,55 @@ class Claim(BaseModel):
 
     id: str
     text: str
+
+
+class ClaimType(str, Enum):
+    """Classification taxonomy for extracted claims."""
+    EVENT = "event"
+    STATISTIC = "statistic"
+    QUOTE = "quote"
+    ATTRIBUTION = "attribution"
+    OTHER = "other"
+
+
+class ExtractedClaim(BaseModel):
+    """Represents an atomic factual statement extracted from unformatted text."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    text: str
+    claim_type: ClaimType
+    checkable: bool
+    source_span: str
+    language: str = "en"
+
+    def to_claim(self) -> Claim:
+        """
+        Converts a checkable ExtractedClaim into a canonical Claim instance
+        with a deterministic, stable ID derived from the SHA-256 hash of its text.
+        """
+        if not self.checkable:
+            raise ValueError(f"Cannot convert non-checkable claim: '{self.text}'")
+        normalized = self.text.strip().lower()
+        hash_id = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+        return Claim(id=f"claim_{hash_id}", text=self.text.strip())
+
+
+class SourceMention(BaseModel):
+    """Source attribution or witness mention identified in the text."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    text: str
+    span: str
+
+
+class ExtractionResult(BaseModel):
+    """Structured output produced by the claim extraction pipeline."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    original_text: str
+    claims: List[ExtractedClaim] = Field(default_factory=list)
+    source_mentions: List[SourceMention] = Field(default_factory=list)
+    error: Optional[str] = None
 
 
 class Evidence(BaseModel):

@@ -1,0 +1,11 @@
+# Stage 4 Claim Extraction Configuration
+model_tag: "llama3.2:3b"
+temperature: 0.0
+max_retries: 2
+max_claims_per_message: 8
+timeout_seconds: 60.0
+seed: 42
+
+# Optional similarity threshold for evaluation semantic matching
+eval_similarity_threshold: 0.85
+eval_borderline_min: 0.70
