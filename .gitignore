@@ -17,7 +17,8 @@ data/processed/*
 data/corpus/*
 !data/corpus/.gitkeep
 
-# Model checkpoints
+# Model checkpoints and outputs
+outputs/
 checkpoints/
 model_checkpoints/
 *.pt

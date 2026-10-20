@@ -1,0 +1,37 @@
+# Stage 2 Baseline Configuration: Text-only claim verification
+model_name: "microsoft/deberta-v3-base"
+
+# Label space corresponding to Verdict enum values
+labels:
+  - "verified"
+  - "contradicted"
+  - "insufficient_evidence"
+
+# Input configuration
+input_mode: "claim_only"          # "claim_only" or "claim_evidence"
+nei_evidence: "random_doc"        # For unevidenced claims, sample a random corpus document
+max_length: 256                   # Maximum token sequence length
+max_doc_chars: 600                # Sensible truncation limit for individual evidence documents
+
+# Data paths
+train_path: "data/processed/train.jsonl"
+val_path: "data/processed/val.jsonl"
+test_path: "data/processed/test.jsonl"
+corpus_path: "data/corpus/corpus_v1.jsonl"
+
+# Training hyperparameters
+batch_size: 8                     # Per-device training & evaluation batch size (fits comfortably in 4GB VRAM)
+grad_accum_steps: 2               # Gradient accumulation steps (effective batch size: 16)
+learning_rate: 2.0e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+epochs: 3
+early_stopping_patience: 1
+seed: 42
+
+# Hardware & precision settings
+precision: "bf16"                 # "bf16" (recommended on Ampere+), "fp16", or "fp32" (fallback for older GPUs)
+
+# Output directory
+output_dir: "outputs/stage2/deberta_v3_baseline"
+run_name: "baseline_run"
