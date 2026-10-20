@@ -71,6 +71,7 @@ class ClaimExtractor:
         self.max_claims_per_message: int = int(self.config.get("max_claims_per_message", 8))
         self.timeout_seconds: float = float(self.config.get("timeout_seconds", 60.0))
         self.seed: int = int(self.config.get("seed", 42))
+        self.store_english: bool = bool(self.config.get("store_english", True))
 
         # Initialize Ollama client with configurable timeout
         if client is not None:
@@ -78,17 +79,20 @@ class ClaimExtractor:
         else:
             self.client = ollama.Client(timeout=self.timeout_seconds)
 
-    def extract(self, text: str) -> ExtractionResult:
+    def extract(self, text: str, store_english: Optional[bool] = None) -> ExtractionResult:
         """
         Extracts factual claims from a text string.
         
         Args:
             text: Raw input message to analyze.
+            store_english: Optional toggle to translate and store English version of non-English claims.
             
         Returns:
             ExtractionResult object containing validated claims and source mentions.
             Returns an empty ExtractionResult with error set if retries are exhausted.
         """
+        if store_english is None:
+            store_english = self.store_english
         if not text or not text.strip():
             return ExtractionResult(original_text=text, claims=[], source_mentions=[])
 
@@ -149,15 +153,22 @@ class ClaimExtractor:
             )
 
         # Apply post-processing pipeline
-        processed_result = self._post_process(text, raw_result)
+        processed_result = self._post_process(text, raw_result, store_english=store_english)
         return processed_result
 
-    def _post_process(self, original_text: str, result: ExtractionResult) -> ExtractionResult:
+    def _post_process(
+        self,
+        original_text: str,
+        result: ExtractionResult,
+        store_english: bool = True,
+    ) -> ExtractionResult:
         """
         Applies sanity checks and filters to raw extracted claims:
         1. Drops any claim whose source_span is not an exact substring of the original message.
         2. Drops duplicate claims (case-insensitive normalized comparison).
-        3. Caps the total number of claims at max_claims_per_message.
+        3. Optionally translates non-English claims into English for storage in metadata['translated_en']
+           without weakening or altering the original language source_span.
+        4. Caps the total number of claims at max_claims_per_message.
         """
         valid_claims = []
         dropped_span_count = 0
@@ -181,6 +192,19 @@ class ClaimExtractor:
                 logger.debug(f"Dropped duplicate claim: '{c.text}'")
                 continue
             seen_claim_texts.add(norm_claim_text)
+
+            # 3. Optional English version storage for multilingual claims (preserving original source_span)
+            if store_english and getattr(c, "language", "en") in ("hi", "hinglish"):
+                try:
+                    from trustnet.lang.translate import Translator
+                    translator = Translator.get_instance()
+                    translated_claim = translator.translate(c.text.strip(), src_lang="hi", tgt_lang="en")
+                    if c.metadata is None:
+                        c.metadata = {}
+                    c.metadata["translated_en"] = translated_claim
+                    c.metadata["original_language"] = c.language
+                except Exception as ex:
+                    logger.debug(f"Translation of extracted claim '{c.text}' failed: {ex}")
 
             valid_claims.append(c)
 

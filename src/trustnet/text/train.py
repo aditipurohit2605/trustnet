@@ -39,6 +39,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Multilingual sequence classification models (verified HF Hub identifiers)
+MULTILINGUAL_MODELS = {
+    "mdeberta": "microsoft/mdeberta-v3-base",
+    "xlmr": "xlm-roberta-base",
+    "muril": "google/muril-base-cased",
+}
+
 
 def set_seed(seed: int = 42) -> None:
     """
@@ -184,8 +191,17 @@ def train(args: argparse.Namespace) -> None:
     with open(args.config, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    # Allow CLI overrides
-    model_name = args.model_name or config.get("model_name", "microsoft/deberta-v3-base")
+    # Multilingual model resolution
+    multilingual_model = getattr(args, "multilingual_model", None)
+    if multilingual_model:
+        model_name = MULTILINGUAL_MODELS.get(multilingual_model, multilingual_model)
+    else:
+        model_name = args.model_name or config.get("model_name", "microsoft/deberta-v3-base")
+
+    training_mode = getattr(args, "training_mode", "english_only")
+    hi_train_path = Path(getattr(args, "hi_train_path", "data/processed/train_text_hi.jsonl"))
+    hi_val_path = Path(getattr(args, "hi_val_path", "data/processed/train_text_hi.jsonl"))
+
     input_mode = args.input_mode or config.get("input_mode", "claim_only")
     batch_size = args.batch_size or int(config.get("batch_size", 8))
     grad_accum_steps = int(config.get("grad_accum_steps", 2))
@@ -244,29 +260,91 @@ def train(args: argparse.Namespace) -> None:
     model.to(device)
 
     # 3. Build Datasets & DataLoaders with Dynamic Padding
-    logger.info(f"Loading training split from: {train_path} [Mode: {input_mode}]")
-    train_dataset = TrustNetTextDataset(
-        split_path=train_path,
-        tokenizer=tokenizer,
-        label_list=labels,
-        corpus_path=corpus_path if input_mode == "claim_evidence" else None,
-        input_mode=input_mode,
-        max_length=max_length,
-        max_doc_chars=max_doc_chars,
-        seed=seed,
-    )
+    logger.info(f"Training mode: '{training_mode}' | Model: '{model_name}'")
 
-    logger.info(f"Loading validation split from: {val_path} [Mode: {input_mode}]")
-    val_dataset = TrustNetTextDataset(
-        split_path=val_path,
-        tokenizer=tokenizer,
-        label_list=labels,
-        corpus_path=corpus_path if input_mode == "claim_evidence" else None,
-        input_mode=input_mode,
-        max_length=max_length,
-        max_doc_chars=max_doc_chars,
-        seed=seed,
-    )
+    if training_mode == "translate_train":
+        logger.info(f"Loading English training split from: {train_path} [Mode: {input_mode}]")
+        train_ds_en = TrustNetTextDataset(
+            split_path=train_path,
+            tokenizer=tokenizer,
+            label_list=labels,
+            corpus_path=corpus_path if input_mode == "claim_evidence" else None,
+            input_mode=input_mode,
+            max_length=max_length,
+            max_doc_chars=max_doc_chars,
+            seed=seed,
+        )
+        logger.info(f"Loading Hindi translated training split from: {hi_train_path} [Mode: {input_mode}]")
+        train_ds_hi = TrustNetTextDataset(
+            split_path=hi_train_path,
+            tokenizer=tokenizer,
+            label_list=labels,
+            corpus_path=corpus_path if input_mode == "claim_evidence" else None,
+            input_mode=input_mode,
+            max_length=max_length,
+            max_doc_chars=max_doc_chars,
+            seed=seed,
+        )
+        train_dataset = torch.utils.data.ConcatDataset([train_ds_en, train_ds_hi])
+        logger.info(f"Combined translate_train dataset created: {len(train_dataset)} total samples ({len(train_ds_en)} en + {len(train_ds_hi)} hi)")
+
+        logger.info(f"Loading validation split from: {val_path} [Mode: {input_mode}]")
+        val_dataset = TrustNetTextDataset(
+            split_path=val_path,
+            tokenizer=tokenizer,
+            label_list=labels,
+            corpus_path=corpus_path if input_mode == "claim_evidence" else None,
+            input_mode=input_mode,
+            max_length=max_length,
+            max_doc_chars=max_doc_chars,
+            seed=seed,
+        )
+    elif training_mode == "zero_shot_transfer":
+        logger.info(f"Zero-shot transfer: training on English {train_path}, validating on Hindi {hi_val_path}")
+        train_dataset = TrustNetTextDataset(
+            split_path=train_path,
+            tokenizer=tokenizer,
+            label_list=labels,
+            corpus_path=corpus_path if input_mode == "claim_evidence" else None,
+            input_mode=input_mode,
+            max_length=max_length,
+            max_doc_chars=max_doc_chars,
+            seed=seed,
+        )
+        val_dataset = TrustNetTextDataset(
+            split_path=hi_val_path,
+            tokenizer=tokenizer,
+            label_list=labels,
+            corpus_path=corpus_path if input_mode == "claim_evidence" else None,
+            input_mode=input_mode,
+            max_length=max_length,
+            max_doc_chars=max_doc_chars,
+            seed=seed,
+        )
+    else:  # "english_only" default
+        logger.info(f"Loading training split from: {train_path} [Mode: {input_mode}]")
+        train_dataset = TrustNetTextDataset(
+            split_path=train_path,
+            tokenizer=tokenizer,
+            label_list=labels,
+            corpus_path=corpus_path if input_mode == "claim_evidence" else None,
+            input_mode=input_mode,
+            max_length=max_length,
+            max_doc_chars=max_doc_chars,
+            seed=seed,
+        )
+
+        logger.info(f"Loading validation split from: {val_path} [Mode: {input_mode}]")
+        val_dataset = TrustNetTextDataset(
+            split_path=val_path,
+            tokenizer=tokenizer,
+            label_list=labels,
+            corpus_path=corpus_path if input_mode == "claim_evidence" else None,
+            input_mode=input_mode,
+            max_length=max_length,
+            max_doc_chars=max_doc_chars,
+            seed=seed,
+        )
 
     pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
     collator = DynamicPaddingCollator(pad_token_id=pad_token_id, pad_to_multiple_of=8 if device.type == "cuda" else None)
@@ -423,6 +501,8 @@ def train(args: argparse.Namespace) -> None:
         "history": history,
         "config": {
             "model_name": model_name,
+            "multilingual_model": multilingual_model,
+            "training_mode": training_mode,
             "input_mode": input_mode,
             "precision": precision_mode,
             "batch_size": batch_size,
@@ -454,6 +534,32 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--learning_rate", type=float, default=None, help="Peak learning rate")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--precision", type=str, choices=["auto", "bf16", "fp16", "fp32"], default="auto", help="Precision mode")
+    parser.add_argument(
+        "--training_mode",
+        type=str,
+        choices=["english_only", "zero_shot_transfer", "translate_train"],
+        default="english_only",
+        help="Training mode: english_only, zero_shot_transfer, or translate_train",
+    )
+    parser.add_argument(
+        "--multilingual_model",
+        type=str,
+        choices=["mdeberta", "xlmr", "muril"],
+        default=None,
+        help="Multilingual sequence classification model preset",
+    )
+    parser.add_argument(
+        "--hi_train_path",
+        type=str,
+        default="data/processed/train_text_hi.jsonl",
+        help="Path to translated Hindi training split",
+    )
+    parser.add_argument(
+        "--hi_val_path",
+        type=str,
+        default="data/processed/train_text_hi.jsonl",
+        help="Path to Hindi validation split for zero_shot_transfer evaluation",
+    )
     parser.add_argument("--wandb", action="store_true", help="Enable optional Weights & Biases logging")
     parser.add_argument("--wandb_project", type=str, default="trustnet", help="Weights & Biases project name")
     return parser.parse_args(args)

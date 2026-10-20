@@ -28,20 +28,25 @@ CRITICAL INSTRUCTIONS & CONSTRAINTS:
    - Do NOT add facts, dates, names, places, or statistics that are not present in the message.
    - Keep relative time expressions (e.g. "today", "yesterday", "last week") exactly as written.
 
-4. EXCLUDE NON-FACTUAL CONTENT:
-   - Exclude opinions, greetings ("Good morning"), emojis, prayers, calls to action ("Forward this immediately"), and rhetorical filler.
+4. LANGUAGE PRESERVATION (LANGUAGE-AWARE EXTRACTION):
+   - For Hindi (Devanagari script) and Hinglish (code-mixed Hindi in Latin script) messages, extract the factual claim 'text' in its ORIGINAL language and script (Hindi in Devanagari, Hinglish in Latin script).
+   - NEVER translate the claim 'text' to English during extraction.
+   - The 'source_span' MUST be an exact character-for-character substring of the original message text in its original language.
 
-5. SEPARATE SOURCE ATTRIBUTIONS:
+5. EXCLUDE NON-FACTUAL CONTENT:
+   - Exclude opinions, greetings ("Good morning", "नमस्ते"), emojis, prayers, calls to action ("Forward this immediately", "वायरल करो"), and rhetorical filler.
+
+6. SEPARATE SOURCE ATTRIBUTIONS:
    - Identify source attributions (e.g. "According to WHO", "My cousin at the hospital said") and extract them into 'source_mentions'. Do not bury the source attribution inside the claim text itself.
 
-6. EXACT SOURCE SPANS:
+7. EXACT SOURCE SPANS:
    - For every extracted claim, 'source_span' MUST be an exact, character-for-character substring of the original message text.
 
-7. OUTPUT SCHEMA:
+8. OUTPUT SCHEMA:
    - Output valid JSON strictly adhering to the schema:
      - "original_text": string
      - "claims": list of ExtractedClaim objects, where each object contains:
-         - "text": string (the standalone atomic factual claim)
+         - "text": string (the standalone atomic factual claim in the original language)
          - "claim_type": "event" | "statistic" | "quote" | "attribution" | "other"
          - "checkable": boolean (true if verifiable with external evidence, false if subjective/untestable)
          - "source_span": string (exact substring from the message)
@@ -78,7 +83,7 @@ Output:
   ]
 }}
 
-Example 2 (Hinglish with event claim):
+Example 2 (Hinglish with event claim in original language):
 Input:
 {UNTRUSTED_CONTENT_START}
 Bhai dekho, Railways ne kal se sabhi trains mein free wifi band kar diya hai. Jaldi forward karo group me!
@@ -88,7 +93,7 @@ Output:
   "original_text": "Bhai dekho, Railways ne kal se sabhi trains mein free wifi band kar diya hai. Jaldi forward karo group me!",
   "claims": [
     {{
-      "text": "Railways discontinued free wifi in all trains starting yesterday.",
+      "text": "Railways ne kal se sabhi trains mein free wifi band kar diya hai.",
       "claim_type": "event",
       "checkable": true,
       "source_span": "Railways ne kal se sabhi trains mein free wifi band kar diya hai",
@@ -98,7 +103,27 @@ Output:
   "source_mentions": []
 }}
 
-Example 3 (Greeting and opinion with NO factual claims):
+Example 3 (Hindi Devanagari with event claim in original language):
+Input:
+{UNTRUSTED_CONTENT_START}
+उत्तरी बांध के जलाशय का जलस्तर सामान्य सीमा के भीतर और सुरक्षित है। इसे सभी ग्रुप में शेयर करें!
+{UNTRUSTED_CONTENT_END}
+Output:
+{{
+  "original_text": "उत्तरी बांध के जलाशय का जलस्तर सामान्य सीमा के भीतर और सुरक्षित है। इसे सभी ग्रुप में शेयर करें!",
+  "claims": [
+    {{
+      "text": "उत्तरी बांध के जलाशय का जलस्तर सामान्य सीमा के भीतर और सुरक्षित है।",
+      "claim_type": "event",
+      "checkable": true,
+      "source_span": "उत्तरी बांध के जलाशय का जलस्तर सामान्य सीमा के भीतर और सुरक्षित है",
+      "language": "hi"
+    }}
+  ],
+  "source_mentions": []
+}}
+
+Example 4 (Greeting and opinion with NO factual claims):
 Input:
 {UNTRUSTED_CONTENT_START}
 Good morning pyare dosto! May your day be blessed with peace and happiness. Always stay positive and remember that hard work is the key to success. Please like and subscribe!

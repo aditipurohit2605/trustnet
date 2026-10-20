@@ -72,6 +72,7 @@ def evaluate_extraction(
     comparisons: List[Dict[str, Any]] = []
     latencies: List[float] = []
     malformed_count = 0
+    lang_stats: Dict[str, Dict[str, int]] = {}
 
     for idx, record in enumerate(gold_records, start=1):
         msg_id = record.get("id", f"msg_{idx}")
@@ -145,8 +146,23 @@ def evaluate_extraction(
                         "status": "unmatched",
                     })
 
+        # Track per-language statistics
+        msg_lang = record.get("language")
+        if not msg_lang:
+            from trustnet.lang.detect import detect_language
+            detected = detect_language(raw_text)
+            msg_lang = "hinglish" if detected.code == "hi-Latn" else detected.code
+
+        if msg_lang not in lang_stats:
+            lang_stats[msg_lang] = {"gold": 0, "pred": 0, "tp": 0}
+
+        lang_stats[msg_lang]["gold"] += len(gold_claim_texts)
+        lang_stats[msg_lang]["pred"] += len(pred_claim_texts)
+        lang_stats[msg_lang]["tp"] += len(matched_gold_indices)
+
         comparisons.append({
             "id": msg_id,
+            "language": msg_lang,
             "text": raw_text,
             "gold_claims": gold_claim_texts,
             "pred_claims": pred_claim_texts,
@@ -168,6 +184,29 @@ def evaluate_extraction(
     avg_latency = (sum(latencies) / len(latencies)) if latencies else 0.0
     malformed_rate = (malformed_count / len(gold_records)) if gold_records else 0.0
 
+    # Per-language metrics and gap reporting
+    by_language: Dict[str, Any] = {}
+    for l_key, s in lang_stats.items():
+        lp = (s["tp"] / s["pred"]) if s["pred"] > 0 else 0.0
+        lr = (s["tp"] / s["gold"]) if s["gold"] > 0 else 0.0
+        lf1 = (2 * lp * lr / (lp + lr)) if (lp + lr) > 0 else 0.0
+        by_language[l_key] = {
+            "gold_claims": s["gold"],
+            "pred_claims": s["pred"],
+            "true_positives": s["tp"],
+            "precision": round(lp, 4),
+            "recall": round(lr, 4),
+            "f1": round(lf1, 4),
+        }
+
+    en_f1 = by_language.get("en", {}).get("f1", 0.0)
+    hi_f1 = by_language.get("hi", {}).get("f1", 0.0)
+    hinglish_f1 = by_language.get("hinglish", {}).get("f1", 0.0)
+    language_gap = {
+        "gap_en_minus_hi": round(en_f1 - hi_f1, 4),
+        "gap_en_minus_hinglish": round(en_f1 - hinglish_f1, 4),
+    }
+
     metrics = {
         "total_messages": len(gold_records),
         "total_gold_claims": total_gold_claims,
@@ -176,6 +215,8 @@ def evaluate_extraction(
         "claim_precision": round(precision, 4),
         "claim_recall": round(recall, 4),
         "claim_f1": round(f1, 4),
+        "by_language": by_language,
+        "language_gap": language_gap,
         "correct_empty_output_share": round(empty_accuracy, 4),
         "average_claims_per_message": round(avg_claims_per_msg, 2),
         "average_latency_seconds": round(avg_latency, 3),

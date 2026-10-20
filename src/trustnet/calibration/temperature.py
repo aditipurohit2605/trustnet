@@ -39,13 +39,21 @@ def _nll_loss(t: float, logits: np.ndarray, labels: np.ndarray) -> float:
 class TemperatureScaler:
     """
     Learns and applies temperature scaling to soften or sharpen model logits.
+    Supports global, per-dataset, and optional per-language-form temperature scaling.
     """
 
-    def __init__(self, per_dataset: bool = False, default_temp: float = 1.0):
+    def __init__(
+        self,
+        per_dataset: bool = False,
+        per_language: bool = False,
+        default_temp: float = 1.0,
+    ):
         self.per_dataset = per_dataset
+        self.per_language = per_language
         self.default_temp = float(default_temp)
         self.global_temperature: float = float(default_temp)
         self.dataset_temperatures: Dict[str, float] = {}
+        self.language_temperatures: Dict[str, float] = {}
         self.fitted: bool = False
 
     def fit(
@@ -53,16 +61,20 @@ class TemperatureScaler:
         logits: np.ndarray,
         labels: np.ndarray,
         datasets: Optional[List[str]] = None,
+        languages: Optional[List[str]] = None,
         per_dataset: Optional[bool] = None,
+        per_language: Optional[bool] = None,
     ) -> "TemperatureScaler":
         """
-        Fits global temperature and optional per-dataset temperatures on val_cal logits.
+        Fits global temperature and optional per-dataset or per-language temperatures on val_cal logits.
         
         Args:
             logits: Array of shape (N, K) containing unscaled prediction logits.
             labels: Array of shape (N,) containing ground truth class indices.
             datasets: Optional list of dataset names of length N.
+            languages: Optional list of language form codes (e.g. 'en', 'hi', 'hinglish') of length N.
             per_dataset: Override self.per_dataset flag if specified.
+            per_language: Override self.per_language flag if specified.
         """
         logits = np.asarray(logits, dtype=np.float64)
         labels = np.asarray(labels, dtype=np.int64)
@@ -74,6 +86,8 @@ class TemperatureScaler:
 
         if per_dataset is not None:
             self.per_dataset = per_dataset
+        if per_language is not None:
+            self.per_language = per_language
 
         # 1. Fit Global Temperature using SciPy L-BFGS-B
         logger.info(f"Fitting global temperature scaling on {n_samples} val_cal samples...")
@@ -109,6 +123,28 @@ class TemperatureScaler:
                     logger.info(f"Insufficient samples for dataset '{d}'; falling back to global T.")
                     self.dataset_temperatures[d] = self.global_temperature
 
+        # 3. Fit Per-Language Temperatures if enabled (behind per_language_temperature flag)
+        if self.per_language and languages is not None:
+            self.language_temperatures = {}
+            unique_langs = sorted(list(set(languages)))
+            for lang in unique_langs:
+                mask = np.array([l == lang for l in languages])
+                l_logits = logits[mask]
+                l_labels = labels[mask]
+                if len(l_labels) >= 2 and len(np.unique(l_labels)) > 1:
+                    l_res = minimize(
+                        fun=_nll_loss,
+                        x0=[self.global_temperature],
+                        args=(l_logits, l_labels),
+                        method="L-BFGS-B",
+                        bounds=[(0.01, 50.0)],
+                    )
+                    self.language_temperatures[lang] = float(l_res.x[0])
+                    logger.info(f"Language '{lang}' temperature T = {self.language_temperatures[lang]:.4f}")
+                else:
+                    logger.info(f"Insufficient samples for language '{lang}'; falling back to global T.")
+                    self.language_temperatures[lang] = self.global_temperature
+
         self.fitted = True
         return self
 
@@ -116,29 +152,38 @@ class TemperatureScaler:
         self,
         logits: np.ndarray,
         dataset: Optional[str] = None,
+        language: Optional[str] = None,
     ) -> np.ndarray:
         """
         Scales logits by the fitted temperature parameter.
         """
         logits = np.asarray(logits, dtype=np.float64)
-        temp = self.get_temperature(dataset=dataset)
+        temp = self.get_temperature(dataset=dataset, language=language)
         return logits / temp
 
     def predict_proba(
         self,
         logits: np.ndarray,
         dataset: Optional[str] = None,
+        language: Optional[str] = None,
     ) -> np.ndarray:
         """
         Applies temperature scaling and softmax normalization to produce calibrated probabilities.
         """
-        scaled = self.scale_logits(logits, dataset=dataset)
+        scaled = self.scale_logits(logits, dataset=dataset, language=language)
         return softmax(scaled, axis=1)
 
-    def get_temperature(self, dataset: Optional[str] = None) -> float:
+    def get_temperature(
+        self,
+        dataset: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> float:
         """
-        Retrieves the appropriate temperature for a given dataset, with fallback to global T.
+        Retrieves the appropriate temperature for a given language form or dataset,
+        with fallback to global T.
         """
+        if self.per_language and language and language in self.language_temperatures:
+            return self.language_temperatures[language]
         if self.per_dataset and dataset and dataset in self.dataset_temperatures:
             return self.dataset_temperatures[dataset]
         return self.global_temperature
@@ -148,12 +193,14 @@ class TemperatureScaler:
         return {
             "fitted": self.fitted,
             "per_dataset": self.per_dataset,
+            "per_language": self.per_language,
             "global_temperature": round(self.global_temperature, 4),
             "dataset_temperatures": {k: round(v, 4) for k, v in self.dataset_temperatures.items()},
+            "language_temperatures": {k: round(v, 4) for k, v in self.language_temperatures.items()},
         }
 
     def save(self, filepath: Union[str, Path]) -> None:
-        """Saves temperature scaling parameters to a JSON file."""
+        """Saves temperature parameters to a JSON file."""
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, "w", encoding="utf-8") as f:
@@ -166,10 +213,16 @@ class TemperatureScaler:
         filepath = Path(filepath)
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
-        scaler = cls(per_dataset=data.get("per_dataset", False))
+        scaler = cls(
+            per_dataset=data.get("per_dataset", False),
+            per_language=data.get("per_language", False),
+        )
         scaler.fitted = data.get("fitted", False)
         scaler.global_temperature = float(data.get("global_temperature", 1.0))
         scaler.dataset_temperatures = {
             k: float(v) for k, v in data.get("dataset_temperatures", {}).items()
+        }
+        scaler.language_temperatures = {
+            k: float(v) for k, v in data.get("language_temperatures", {}).items()
         }
         return scaler

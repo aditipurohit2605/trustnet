@@ -10,6 +10,7 @@ Orchestrates:
 
 import json
 import logging
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -155,6 +156,8 @@ class MultimodalPredictor:
         argmax_idx = int(np.argmax(cal_probs))
         predicted_verdict_str = self.class_names[argmax_idx]
         calibrated_conf = float(cal_probs[argmax_idx])
+        if math.isnan(calibrated_conf):
+            calibrated_conf = 0.3333
 
         raw_prob_dict = {
             self.class_names[i]: round(float(raw_probs[i]), 4) for i in range(len(self.class_names))
@@ -205,6 +208,10 @@ class MultimodalPredictor:
                 if hasattr(self.model.model, "clip_projector"):
                     clip_dim = self.model.model.clip_projector[0].in_features
 
+            scores_list = [float(e.score) for e in evidence if e.score is not None and not math.isnan(float(e.score))]
+            top1_sc = scores_list[0] if scores_list else 1.0
+            mean_sc = float(np.mean(scores_list)) if scores_list else 0.5
+
             rec = {
                 "claim_id": claim.id,
                 "claim_text": claim.text,
@@ -212,10 +219,10 @@ class MultimodalPredictor:
                 "text_logits": [0.0, 0.0, 0.0],
                 "text_pooled": [0.0] * text_dim,
                 "retrieval_features": {
-                    "top1_score": evidence[0].score if evidence and evidence[0].score else 1.0,
+                    "top1_score": top1_sc,
                     "top1_top2_gap": 0.5,
                     "num_passages_above_threshold": len(evidence),
-                    "mean_score": np.mean([e.score for e in evidence if e.score]) if evidence else 0.5,
+                    "mean_score": mean_sc,
                     "source_type_corpus_passage": len(evidence),
                     "source_type_government": 0.0,
                     "source_type_news": 0.0,
@@ -253,4 +260,7 @@ class MultimodalPredictor:
             calibrated_probabilities=pred_info["calibrated_probabilities"],
             abstention_reason=pred_info["abstention_reason"],
             gaps=["Confidence below threshold; abstained from verdict."] if pred_info["abstained"] else [],
+            language_info=getattr(claim, "language_info", None),
+            original_text=getattr(claim, "original_text", None) or claim.text,
+            normalized_text=getattr(claim, "normalized_text", None),
         )

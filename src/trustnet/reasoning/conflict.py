@@ -34,6 +34,10 @@ class ConflictDetector:
     Detects contradictory evidence from authoritative sources for a factual claim.
     """
 
+    _cached_text_model: Optional[Any] = None
+    _cached_tokenizer: Optional[Any] = None
+    _cached_model_dir: Optional[Path] = None
+
     def __init__(
         self,
         text_model: Optional[Any] = None,
@@ -63,6 +67,11 @@ class ConflictDetector:
         if self.text_model is not None and self.tokenizer is not None:
             return
 
+        if ConflictDetector._cached_text_model is not None and ConflictDetector._cached_model_dir == self.model_dir:
+            self.text_model = ConflictDetector._cached_text_model
+            self.tokenizer = ConflictDetector._cached_tokenizer
+            return
+
         if self.model_dir.exists():
             try:
                 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -70,6 +79,9 @@ class ConflictDetector:
                 self.tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir))
                 self.text_model = AutoModelForSequenceClassification.from_pretrained(str(self.model_dir)).to(self.device)
                 self.text_model.eval()
+                ConflictDetector._cached_text_model = self.text_model
+                ConflictDetector._cached_tokenizer = self.tokenizer
+                ConflictDetector._cached_model_dir = self.model_dir
             except Exception as e:
                 logger.warning(f"Could not load Stage 2 text model from {self.model_dir}: {e}")
 

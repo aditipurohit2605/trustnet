@@ -47,12 +47,35 @@ class Verdict(str, Enum):
         return cls(cleaned)
 
 
+class LanguageInfo(BaseModel):
+    """Detected language and script metadata for multilingual text processing."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str  # e.g., 'en', 'hi', 'hi-Latn'
+    script: str  # e.g., 'Devanagari', 'Latin', 'mixed', 'unknown'
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    is_code_mixed: bool = False
+
+
+class NormalizedText(BaseModel):
+    """Structured record tracking text normalization, transliteration, and translation."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    original: str
+    normalized: str
+    translated_en: Optional[str] = None
+    steps: List[str] = Field(default_factory=list)
+
+
 class Claim(BaseModel):
     """Represents a factual claim to be verified."""
     model_config = ConfigDict(populate_by_name=True)
 
     id: str
     text: str
+    language_info: Optional[LanguageInfo] = None
+    original_text: Optional[str] = None
+    normalized_text: Optional[NormalizedText] = None
 
 
 class ClaimType(str, Enum):
@@ -211,6 +234,11 @@ class ClaimReport(BaseModel):
     counterfactuals: Optional[List[Counterfactual]] = None
     share_advice: Optional[ShareAdvice] = None
     reasoning_notes: List[str] = Field(default_factory=list)
+
+    # Stage 9 Multilingual Extensions
+    language_info: Optional[LanguageInfo] = None
+    original_text: Optional[str] = None
+    normalized_text: Optional[NormalizedText] = None
 
     @field_validator("gaps", mode="before")
     @classmethod

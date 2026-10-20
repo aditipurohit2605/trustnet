@@ -1,0 +1,45 @@
+# Stage 9 Multilingual Configuration: Hindi and Hinglish Support
+seed: 42
+
+# Operational strategy:
+# - translate_test: translates incoming Hindi/Hinglish to English and evaluates through existing models.
+# - native: evaluates Hindi directly using multilingual text models without translation.
+# - hybrid: runs both native and translated pathways and ensembles their confidence scores.
+strategy: "translate_test"  # "translate_test", "native", or "hybrid"
+
+# Multilingual sequence classification text models (verified Hugging Face Hub IDs):
+# 1. microsoft/mdeberta-v3-base (Multilingual DeBERTa-v3, 86 languages including Hindi)
+# 2. xlm-roberta-base (XLM-RoBERTa base, 100 languages)
+# 3. google/muril-base-cased (MuRIL: Multilingual Representations for Indian Languages, 17 Indian languages + English)
+text_model: "microsoft/mdeberta-v3-base"
+
+# Translation models (Helsinki-NLP Opus-MT, MarianMT architecture, open Apache 2.0 license)
+# Download size: ~300 MB, VRAM: ~600 MB in fp16
+translator_model_hi_en: "Helsinki-NLP/opus-mt-hi-en"
+translator_model_en_hi: "Helsinki-NLP/opus-mt-en-hi"
+translation_cache_path: "outputs/stage9/translation_cache.json"
+
+# Language identification model / engine:
+# "indic_hybrid" combines Unicode script detection with Hinglish romanized lexical n-gram analysis
+lang_id_model: "indic_hybrid"
+
+# Supported target languages
+supported_languages:
+  - "en"
+  - "hi"
+
+# Hinglish handling mode for Latin-script Hindi:
+# - none: keep Hinglish text as-is
+# - transliterate: transliterate Latin-script Hinglish to Devanagari using Sanscript
+# - translate: translate Hinglish meaning into English for verification
+hinglish_normalization: "translate"  # "none", "transliterate", "translate"
+
+# Calibration settings:
+# Toggle per-language-form temperature calibration (separate temperatures for en, hi, hinglish)
+per_language_temperature: false
+
+# Corpus and data paths
+corpus_en_path: "data/corpus/corpus_v1.jsonl"
+corpus_india_path: "data/corpus/corpus_india.jsonl"
+parallel_set_path: "data/eval/parallel_set.jsonl"
+output_dir: "outputs/stage9"

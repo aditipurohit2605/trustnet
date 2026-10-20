@@ -47,19 +47,21 @@ class ClipScorer:
         pretrained: str = "laion2b_s34b_b79k",
         device: str = "auto",
         fp16: bool = True,
-        text_encoder_mode: str = "clip",
+        text_encoder_mode: str = "translate_first",
     ):
         """
         Args:
-            model_name: Architecture tag (e.g. 'ViT-B-32').
-            pretrained: Checkpoint tag (e.g. 'laion2b_s34b_b79k').
+            model_name: Architecture tag (e.g. 'ViT-B-32' or multilingual 'xlm-roberta-base-ViT-B-32').
+            pretrained: Checkpoint tag (e.g. 'laion2b_s34b_b79k' or multilingual 'laion5b_s13b_b90k').
             device: 'auto', 'cuda', or 'cpu'.
             fp16: Whether to use half-precision on GPU (auto-disabled on CPU).
-            text_encoder_mode: 'clip' (direct tokenization) or 'translate_first'.
+            text_encoder_mode: 'translate_first' (translates Hindi/Hinglish to English before encoding)
+                              or 'multilingual' (uses native multilingual tokenizer like xlm-roberta-base-ViT-B-32).
         """
         self.model_name = model_name
         self.pretrained = pretrained
         self.text_encoder_mode = text_encoder_mode
+        self._is_native_multilingual = "xlm" in model_name.lower() or "muril" in model_name.lower()
 
         # Resolve compute device
         if device == "auto":
@@ -148,15 +150,43 @@ class ClipScorer:
         if isinstance(texts, str):
             texts = [texts]
 
+        # Handle text_encoder_mode for non-English queries
+        processed_texts: List[str] = []
+        for t in texts:
+            needs_translation = False
+            # Check for Devanagari unicode range \u0900-\u097F or non-ASCII
+            has_devanagari = any("\u0900" <= ch <= "\u097f" for ch in t)
+
+            if self.text_encoder_mode == "translate_first":
+                needs_translation = has_devanagari
+            elif self.text_encoder_mode == "multilingual":
+                # If model is not natively multilingual (e.g., standard English ViT-B-32),
+                # translate to avoid OOV token collapse while documenting requirement
+                if not self._is_native_multilingual and has_devanagari:
+                    logger.debug(
+                        f"Current OpenCLIP checkpoint '{self.model_name}' is English-only. "
+                        f"To tokenize natively, configure 'xlm-roberta-base-ViT-B-32' (tag: 'laion5b_s13b_b90k'). "
+                        f"Translating query to English for compatibility."
+                    )
+                    needs_translation = True
+
+            if needs_translation:
+                try:
+                    from trustnet.lang.translate import Translator
+                    translator = Translator.get_instance()
+                    translated = translator.translate(t, src_lang="hi", tgt_lang="en")
+                    processed_texts.append(translated)
+                except Exception as ex:
+                    logger.warning(f"ClipScorer translation failed for '{t}': {ex}")
+                    processed_texts.append(t)
+            else:
+                processed_texts.append(t)
+
         all_embeddings: List[np.ndarray] = []
 
         with torch.no_grad():
-            for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i : i + batch_size]
-
-                # Note on text_encoder_mode:
-                # If set to 'translate_first' and non-English scripts are present,
-                # downstream pipelines can supply translated text or note limitation.
+            for i in range(0, len(processed_texts), batch_size):
+                batch_texts = processed_texts[i : i + batch_size]
                 tokens = self.tokenizer(batch_texts).to(self.device)
 
                 features = self.model.encode_text(tokens)

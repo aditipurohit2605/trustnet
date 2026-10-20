@@ -21,21 +21,26 @@ from trustnet.schemas import Evidence, TemporalInfo
 
 logger = logging.getLogger(__name__)
 
-# Keywords indicating present-tense or breaking assertions
+DEVANAGARI_DIGITS_MAP = str.maketrans("०१२३४५६७८९", "0123456789")
+
+# Keywords indicating present-tense or breaking assertions (English, Hinglish, Devanagari)
 NOW_KEYWORDS = {
     "today", "now", "currently", "breaking", "urgent", "this morning", "tonight",
-    "aaj", "abhi", "filhal", "is samay", "is waqt", "haali me", "aaj subah",
+    "aaj", "abhi", "filhal", "is samay", "is waqt", "haali me", "aaj subah", "turant",
+    "आज", "अभी", "फिलहाल", "इस समय", "इस वक्त", "हाल ही में", "आज सुबह", "आज शाम", "आज रात", "तुरंत",
 }
 
-# General English & Hindi temporal keywords for extraction
+# General English, Hinglish, and Hindi temporal keywords for extraction
 TEMPORAL_KEYWORDS = {
     "today", "yesterday", "tomorrow", "recently", "now", "currently",
     "last night", "this morning", "last week", "this week", "last month", "this year",
-    "aaj", "kal", "parson", "abhi", "filhal", "is samay", "is waqt",
-    "subah", "shaam", "raat",
+    "aaj", "kal", "parso", "parson", "abhi", "filhal", "is samay", "is waqt",
+    "subah", "shaam", "raat", "haali me", "turant",
+    "आज", "कल", "परसों", "परसो", "अभी", "फिलहाल", "हाल ही में", "इस समय", "इस वक्त",
+    "सुबह", "शाम", "रात", "तुरंत", "बीते कल", "आने वाले कल",
 }
 
-# Regex for explicit year, month, or formatted date strings
+# Regex for explicit year, month, or formatted date strings (ASCII digits)
 DATE_REGEX = re.compile(
     r"\b(?:"
     r"\d{4}[-/]\d{1,2}[-/]\d{1,2}"  # YYYY-MM-DD or YYYY/MM/DD
@@ -47,6 +52,9 @@ DATE_REGEX = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+
+# Regex matching Devanagari 4-digit years (e.g. २०२४, २०१९)
+DEVANAGARI_YEAR_REGEX = re.compile(r"[०-९]{4}")
 
 
 class TemporalAnalyzer:
@@ -82,7 +90,13 @@ class TemporalAnalyzer:
                 if kw not in expressions:
                     expressions.append(kw)
 
-        # 2. Match explicit formatted dates and years via regex
+        # 2. Match Devanagari years (e.g., २०२४)
+        dev_years = DEVANAGARI_YEAR_REGEX.findall(text)
+        for dy in dev_years:
+            if dy not in expressions:
+                expressions.append(dy)
+
+        # 3. Match explicit formatted dates and years via regex
         matches = DATE_REGEX.findall(text)
         for m in matches:
             m_clean = m.strip()
@@ -94,13 +108,14 @@ class TemporalAnalyzer:
     def parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
         """
         Parses an ISO or freeform date string safely using dateparser.
+        Supports Devanagari numerals by normalizing them to ASCII digits.
         Returns None if missing or unparseable (never guesses).
         """
         if not date_str or not isinstance(date_str, str) or not date_str.strip():
             return None
 
-        # Clean string
-        clean_str = date_str.strip()
+        # Clean string and normalize Devanagari numerals
+        clean_str = date_str.strip().translate(DEVANAGARI_DIGITS_MAP)
         try:
             # First try ISO format
             if len(clean_str) >= 10 and clean_str[4] == "-" and clean_str[7] == "-":

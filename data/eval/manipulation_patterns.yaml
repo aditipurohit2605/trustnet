@@ -1,4 +1,4 @@
-# Manipulation and Rhetorical Tactics Catalog for TrustNet Stage 8
+# Manipulation and Rhetorical Tactics Catalog for TrustNet Stage 8 & 9
 patterns:
   - name: "urgent_forward_plea"
     description: "Explicit appeals prompting the reader to forward or spread the message immediately to friends/groups."
@@ -6,6 +6,7 @@ patterns:
       - "Forward to all your groups right now!"
       - "Share before this message is taken down!"
       - "Jaldi se sabko share karo"
+      - "तुरंत शेयर करें और सबको भेजो!"
     indicators:
       - "forward to"
       - "share before"
@@ -15,6 +16,12 @@ patterns:
       - "share karo"
       - "sabko bhejo"
       - "viral karo"
+      - "jaldi forward karo"
+      - "jaldi share karo"
+      - "सबको भेजो"
+      - "तुरंत शेयर करें"
+      - "वायरल करो"
+      - "फॉरवर्ड करो"
 
   - name: "false_authority_appeal"
     description: "Invoking reputable organizations, doctors, or unnamed insiders without links or verifiable citations."
@@ -22,6 +29,7 @@ patterns:
       - "NASA has officially confirmed the cosmic ray alert tonight."
       - "Senior doctor from AIIMS warns everyone to avoid tap water."
       - "My uncle in the ministry just leaked this secret order."
+      - "एम्स के वरिष्ठ डॉक्टर ने चेतावनी दी है।"
     indicators:
       - "nasa confirmed"
       - "who declared"
@@ -29,24 +37,36 @@ patterns:
       - "doctor from aiims"
       - "ministry insider"
       - "sources inside the department"
+      - "aiims ke doctor"
+      - "who ne ban kiya"
+      - "नासा ने चेतावनी दी"
+      - "एम्स के डॉक्टर"
+      - "डब्ल्यूएचओ ने कहा"
 
   - name: "emotional_outrage_bait"
     description: "Sensationalized phrasing designed to provoke anger, disgust, or moral outrage."
     examples:
       - "Shameful betrayal of our cultural values!"
       - "Shocking scam exposed, politicians looting poor people!"
+      - "यह शर्मनाक हरकत देखकर आपका खून खौल उठेगा।"
     indicators:
       - "shameful"
       - "shocking betrayal"
       - "open your eyes"
       - "wake up"
       - "looting us"
+      - "sharmnaak"
+      - "aankhein kholo"
+      - "शर्मनाक"
+      - "देश को लूटा जा रहा है"
+      - "आंखें खोलो"
 
   - name: "conspiracy_framing"
     description: "Framing standard events as covert plots or claiming mainstream media is suppressing truth."
     examples:
       - "Mainstream media is completely silent on this explosive revelation!"
       - "The truth they don't want you to see."
+      - "गोदी मीडिया इस सच को कभी नहीं दिखाएगा।"
     indicators:
       - "media is silent"
       - "media won't show"
@@ -54,14 +74,24 @@ patterns:
       - "secret plot"
       - "ancient gold reserves"
       - "temple ruins"
+      - "media chup hai"
+      - "media nahi dikhayega"
+      - "मीडिया चुप है"
+      - "मीडिया नहीं दिखाएगा"
+      - "सच छुपा रहे हैं"
 
   - name: "clickbait_urgency"
     description: "Creating artificial panic or emergency to compel uncritical consumption."
     examples:
       - "URGENT ALERT: Shut off your phones tonight between 12 AM and 3 AM!"
       - "Danger warning! Do not eat this food starting tomorrow!"
+      - "सावधान! आज रात 12 बजे से पहले यह काम कर लें।"
     indicators:
       - "urgent alert"
       - "emergency warning"
       - "khatra"
       - "dhyan se padhein"
+      - "dhyan se suno"
+      - "सावधान"
+      - "खतरे की घंटी"
+      - "आपातकालीन चेतावनी"

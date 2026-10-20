@@ -348,20 +348,74 @@ def verify_claim(
     predictor: Optional[Any] = None,
     enable_reasoning: bool = True,
     reasoning_config: Optional[Any] = None,
+    multilingual_config: Optional[Any] = None,
 ) -> ClaimReport:
     """
     Verifies a single Claim instance using calibrated multimodal prediction and abstention,
-    enriched with the Stage 8 reasoning layer.
+    enriched with the Stage 8 reasoning layer and Stage 9 multilingual support.
     """
+    # Stage 9: Language identification, normalization, and original text tracking
+    if getattr(claim, "original_text", None) is None:
+        claim.original_text = claim.text
+
+    if getattr(claim, "language_info", None) is None:
+        try:
+            from trustnet.lang.detect import detect_language
+            claim.language_info = detect_language(claim.original_text or claim.text)
+        except Exception as e:
+            logger.debug(f"Language detection skipped: {e}")
+
+    if getattr(claim, "normalized_text", None) is None:
+        try:
+            from trustnet.lang.normalize import normalize_text
+            claim.normalized_text = normalize_text(claim.original_text or claim.text)
+        except Exception as e:
+            logger.debug(f"Normalization skipped: {e}")
+
+    # Resolve strategy if non-English
+    effective_claim = claim
+    lang_code = claim.language_info.code if claim.language_info else "en"
+    if lang_code in ("hi", "hi-Latn"):
+        strategy = "translate_test"
+        if isinstance(multilingual_config, dict):
+            strategy = multilingual_config.get("strategy", "translate_test")
+        elif isinstance(multilingual_config, (str, Path)) and Path(multilingual_config).is_file():
+            import yaml
+            with open(multilingual_config, "r", encoding="utf-8") as f:
+                strategy = yaml.safe_load(f).get("strategy", "translate_test")
+
+        if strategy in ("translate_test", "hybrid"):
+            try:
+                from trustnet.lang.translate import Translator
+                translator = Translator.get_instance()
+                norm_str = claim.normalized_text.normalized if claim.normalized_text else claim.text
+                translated_en = translator.translate(norm_str, src_lang="hi", tgt_lang="en")
+                if claim.normalized_text:
+                    claim.normalized_text.translated_en = translated_en
+                effective_claim = Claim(
+                    id=claim.id,
+                    text=translated_en,
+                    language_info=claim.language_info,
+                    original_text=claim.original_text,
+                    normalized_text=claim.normalized_text,
+                )
+            except Exception as e:
+                logger.warning(f"Translation failed in verify_claim: {e}")
+
     if predictor is None:
         from trustnet.fusion.predict import MultimodalPredictor
         predictor = MultimodalPredictor.from_artifacts()
 
     report = predictor.predict_claim_report(
-        claim=claim,
+        claim=effective_claim,
         evidence=evidence or [],
         image_path=image_path,
     )
+
+    # Ensure report always shows what user wrote and what module used
+    report.language_info = claim.language_info
+    report.original_text = claim.original_text or claim.text
+    report.normalized_text = claim.normalized_text
 
     if enable_reasoning:
         report = apply_reasoning_to_report(report, reasoning_config=reasoning_config)
@@ -379,12 +433,13 @@ def run_full_verification_pipeline(
     top_k: int = 5,
     enable_reasoning: bool = True,
     reasoning_config: Optional[Any] = None,
+    multilingual_config: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Full end-to-end verification pipeline:
     1. Extracts checkable claims and source mentions from input text.
     2. Retrieves top-k evidence documents per claim.
-    3. Runs calibrated multimodal prediction and abstention.
+    3. Runs calibrated multimodal prediction, multilingual translation, and abstention.
     4. Executes the Stage 8 reasoning layer (conflict, freshness, gaps, share advice).
     5. Returns structured results containing enriched ClaimReport instances.
     """
@@ -407,19 +462,15 @@ def run_full_verification_pipeline(
         claim_obj = item["claim"]
         evidence_items = item["evidence"]
 
-        report = predictor.predict_claim_report(
+        report = verify_claim(
             claim=claim_obj,
             evidence=evidence_items,
             image_path=image_path,
+            predictor=predictor,
+            enable_reasoning=enable_reasoning,
+            reasoning_config=reasoning_config,
+            multilingual_config=multilingual_config,
         )
-
-        if enable_reasoning:
-            report = apply_reasoning_to_report(
-                report,
-                reasoning_config=reasoning_config,
-                source_mentions=source_mentions,
-                original_message=text,
-            )
 
         reports.append(report)
 
