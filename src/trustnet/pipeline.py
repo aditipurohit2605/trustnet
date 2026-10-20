@@ -170,3 +170,73 @@ def run_extraction_for_image_text(
         "error": extraction_result.error,
     }
 
+
+def verify_claim(
+    claim: Claim,
+    evidence: Optional[List[Evidence]] = None,
+    image_path: Optional[str] = None,
+    predictor: Optional[Any] = None,
+) -> Any:
+    """
+    Verifies a single Claim instance using calibrated multimodal prediction and abstention.
+    Preserves the original claim text and returns a ClaimReport with abstention fields.
+    """
+    if predictor is None:
+        from trustnet.fusion.predict import MultimodalPredictor
+        predictor = MultimodalPredictor()
+
+    return predictor.predict_claim_report(
+        claim=claim,
+        evidence=evidence or [],
+        image_path=image_path,
+    )
+
+
+def run_full_verification_pipeline(
+    text: str,
+    image_path: Optional[str] = None,
+    retriever: Optional[Retriever] = None,
+    extractor: Optional[ClaimExtractor] = None,
+    predictor: Optional[Any] = None,
+    retrieval_mode: str = "hybrid_rerank",
+    top_k: int = 5,
+) -> Dict[str, Any]:
+    """
+    Full end-to-end verification pipeline:
+    1. Extracts checkable claims from input text.
+    2. Retrieves top-k evidence documents per claim.
+    3. Runs calibrated multimodal prediction and abstention.
+    4. Returns structured results containing a ClaimReport for each checkable claim.
+    """
+    if predictor is None:
+        from trustnet.fusion.predict import MultimodalPredictor
+        predictor = MultimodalPredictor()
+
+    retrieval_result = run_retrieval_for_message(
+        text=text,
+        retriever=retriever,
+        extractor=extractor,
+        mode=retrieval_mode,
+        top_k=top_k,
+    )
+
+    reports = []
+    for item in retrieval_result.get("claim_retrievals", []):
+        claim_obj = item["claim"]
+        evidence_items = item["evidence"]
+
+        report = predictor.predict_claim_report(
+            claim=claim_obj,
+            evidence=evidence_items,
+            image_path=image_path,
+        )
+        reports.append(report)
+
+    return {
+        "original_text": text,
+        "image_path": image_path,
+        "reports": reports,
+        "extraction": retrieval_result,
+    }
+
+

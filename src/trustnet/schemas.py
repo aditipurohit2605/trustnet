@@ -129,6 +129,10 @@ class ClaimReport(BaseModel):
     evidence: List[Evidence] = Field(default_factory=list)
     verdict: Verdict
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence must be between 0 and 1.")
+    abstained: bool = Field(default=False, description="Flag indicating if the system abstained from making a definitive verdict.")
+    raw_probabilities: Optional[Dict[str, float]] = Field(default=None, description="Uncalibrated model output probability distribution.")
+    calibrated_probabilities: Optional[Dict[str, float]] = Field(default=None, description="Calibrated probability distribution for dashboard and reporting.")
+    abstention_reason: Optional[str] = Field(default=None, description="Explanation if system abstains.")
     gaps: List[str] = Field(default_factory=list)
 
 

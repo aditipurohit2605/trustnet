@@ -1,0 +1,20 @@
+# TrustNet Stage 7: Calibration, Uncertainty, and Abstention Configuration
+seed: 42
+n_bins: 15
+target_error_rates:
+  - 0.05
+  - 0.10
+  - 0.15
+confidently_wrong_cutoff: 0.8
+ensemble_seeds:
+  - 42
+  - 101
+  - 202
+  - 303
+  - 404
+bootstrap_samples: 1000
+conformal_enabled: false
+conformal_alpha: 0.1
+temperature_per_dataset: false
+confidence_metric: "max_prob"  # options: max_prob, normalized_entropy
+output_dir: "outputs/stage7"

@@ -1,0 +1,8 @@
+{"claim_id": "ind_001", "claim_text": "The dam reservoir levels are currently normal and safe according to official telemetry.", "dataset": "indian_demo", "label4": "verified", "image_path": "data/eval/images/ocr_en_1.png"}
+{"claim_id": "ind_002", "claim_text": "Breaking: Dam has breached and submerged downstream towns completely.", "dataset": "indian_demo", "label4": "contradicted", "image_path": "data/eval/images/ocr_en_2.png"}
+{"claim_id": "ind_003", "claim_text": "WHO issued an immediate nationwide ban on Covaxin usage across India.", "dataset": "indian_demo", "label4": "contradicted", "image_path": null}
+{"claim_id": "ind_004", "claim_text": "ISRO confirmed the successful orbital insertion of the meteorological satellite.", "dataset": "indian_demo", "label4": "verified", "image_path": "data/eval/images/ocr_en_3.png"}
+{"claim_id": "ind_005", "claim_text": "Unverified viral video claims underground gold reserves discovered beneath ancient temple.", "dataset": "indian_demo", "label4": "insufficient_evidence", "image_path": null}
+{"claim_id": "ind_006", "claim_text": "बाढ़ की स्थिति पूरी तरह से नियंत्रण में है और हेल्पलाइन नंबर चालू है।", "dataset": "indian_demo", "label4": "verified", "image_path": "data/eval/images/ocr_hi_1.png"}
+{"claim_id": "ind_007", "claim_text": "Weather department predicts light rain tomorrow morning across coastal districts.", "dataset": "indian_demo", "label4": "verified", "image_path": "data/eval/images/ocr_en_4.png"}
+{"claim_id": "ind_008", "claim_text": "Ancient herbal concoction cures viral infection in exactly three hours without hospital admission.", "dataset": "indian_demo", "label4": "contradicted", "image_path": null}
