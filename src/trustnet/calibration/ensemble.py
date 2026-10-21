@@ -44,7 +44,7 @@ def extract_mlp_logits(
     Extracts raw unnormalized logits [N, 3] from a trained PyTorch MLP model.
     """
     trainer.model.eval()
-    ds = MultimodalDataset(records, active_groups=active_groups)
+    ds = MultimodalDataset(records, active_groups=None)
     loader = DataLoader(ds, batch_size=trainer.batch_size, shuffle=False)
     all_logits = []
 
@@ -54,6 +54,20 @@ def extract_mlp_logits(
             compact = batch["compact"].to(device)
             clip = batch["clip"].to(device)
             text_pooled = batch["text_pooled"].to(device)
+
+            if active_groups is not None:
+                from trustnet.fusion.features import FEATURE_GROUPS, FEATURE_NAMES
+                inactive_indices = []
+                for g, fnames in FEATURE_GROUPS.items():
+                    if g not in active_groups:
+                        for fn in fnames:
+                            inactive_indices.append(FEATURE_NAMES.index(fn))
+                if inactive_indices:
+                    compact[:, inactive_indices] = 0.0
+                if "image" not in active_groups:
+                    clip.zero_()
+                if "text" not in active_groups:
+                    text_pooled.zero_()
 
             logits = trainer.model(compact, clip, text_pooled)
             all_logits.append(logits.cpu().numpy())
