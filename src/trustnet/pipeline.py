@@ -11,10 +11,79 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from trustnet.retrieval.retriever import Retriever
-from trustnet.schemas import Claim, ClaimReport, Evidence, ExtractedClaim
+from trustnet.schemas import (
+    AbstainReason,
+    Claim,
+    ClaimReport,
+    Evidence,
+    EvidenceStatus,
+    ExtractedClaim,
+    ReportDecision,
+    SearchCoverage,
+    ShareAdvice,
+    Verdict,
+)
 from trustnet.text.extraction.extractor import ClaimExtractor
 
 logger = logging.getLogger(__name__)
+
+
+def build_search_coverage(
+    evidence: List[Evidence],
+    retrieval_config: Optional[Union[str, Path, Dict[str, Any]]] = None,
+    total_retrieved: Optional[int] = None,
+) -> SearchCoverage:
+    """
+    Constructs a SearchCoverage telemetry object from config and retrieved candidates.
+    """
+    import yaml
+    cfg: Dict[str, Any] = {}
+    if retrieval_config is None:
+        cfg_path = Path("configs/stage3_retrieval.yaml")
+        if cfg_path.exists():
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+    elif isinstance(retrieval_config, (str, Path)):
+        if Path(retrieval_config).exists():
+            with open(retrieval_config, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+    elif isinstance(retrieval_config, dict):
+        cfg = retrieval_config
+
+    relevance_threshold = float(cfg.get("relevance_threshold", 0.50))
+    not_searched = list(cfg.get("not_searched", [
+        "social_media_archives",
+        "real_time_web",
+        "subscription_databases",
+    ]))
+    corpus_path_str = cfg.get("corpus_path", "data/corpus/corpus_v1.jsonl")
+    corpus_p = Path(corpus_path_str)
+
+    total_docs = 0
+    if corpus_p.exists():
+        try:
+            with open(corpus_p, "r", encoding="utf-8") as f:
+                total_docs = sum(1 for line in f if line.strip())
+        except Exception:
+            total_docs = 5
+    else:
+        total_docs = 5
+
+    corpus_name = corpus_p.stem if corpus_p.stem else "corpus_v1"
+    candidates_count = total_retrieved if total_retrieved is not None else len(evidence)
+
+    scores = [float(e.score) for e in evidence if e.score is not None]
+    top_score = max(scores) if scores else 0.0
+    passages_above = sum(1 for s in scores if s >= relevance_threshold)
+
+    return SearchCoverage(
+        corpus_name=corpus_name,
+        total_documents_indexed=total_docs,
+        candidates_retrieved=candidates_count,
+        passages_above_threshold=passages_above,
+        top_score=round(top_score, 4),
+        not_searched=not_searched,
+    )
 
 
 def run_retrieval_for_message(
@@ -284,6 +353,7 @@ def apply_reasoning_to_report(
                 temporal_info=report.temporal,
                 image_signals=image_signals,
                 source_mentions=source_mentions,
+                search_coverage=report.search_coverage,
             )
             # Combine newly identified gaps with existing legacy notes
             report.gaps = gaps
@@ -298,25 +368,46 @@ def apply_reasoning_to_report(
         try:
             from trustnet.reasoning.counterfactual import CounterfactualGenerator
             c_gen = CounterfactualGenerator(max_counterfactuals=cfg.get("max_counterfactuals", 5))
-            dummy_rec = {
-                "claim_id": report.claim.id,
-                "claim_text": report.claim.text,
-                "dataset": "pipeline",
-                "text_logits": [0.0, 0.0, 0.0],
-                "text_pooled": [0.0] * 32,
-                "retrieval_features": {
-                    "top1_score": report.evidence[0].score if report.evidence and report.evidence[0].score else 1.0,
-                    "top1_top2_gap": 0.5,
-                    "num_passages_above_threshold": len(report.evidence),
-                    "mean_score": 1.0,
-                    "source_type_government": sum(1 for e in report.evidence if (e.source_type or "").lower() == "government"),
-                },
-                "image_features": {
-                    "image_present": 1 if image_signals else 0,
-                    "mismatch_score": getattr(image_signals, "mismatch_score", 0.0) if image_signals else 0.0,
-                },
-            }
-            c_list = c_gen.generate(dummy_rec, original_verdict=report.verdict)
+            
+            # Feed real features into the predictor
+            feat_rec = getattr(report, "feature_record", None)
+            if not feat_rec:
+                scores_list = [float(e.score) for e in report.evidence if e.score is not None]
+                top1_sc = scores_list[0] if scores_list else 1.0
+                mean_sc = float(sum(scores_list) / len(scores_list)) if scores_list else 0.5
+                raw_p = report.raw_probabilities or {}
+                t_logits = [raw_p.get("verified", 0.0), raw_p.get("contradicted", 0.0), raw_p.get("insufficient_evidence", 0.0)]
+                feat_rec = {
+                    "claim_id": report.claim.id,
+                    "claim_text": report.claim.text,
+                    "dataset": "pipeline",
+                    "text_logits": t_logits,
+                    "text_pooled": [0.0] * 32,
+                    "retrieval_features": {
+                        "top1_score": top1_sc,
+                        "top1_top2_gap": 0.5,
+                        "num_passages_above_threshold": len(report.evidence),
+                        "mean_score": mean_sc,
+                        "source_type_corpus_passage": len(report.evidence),
+                        "source_type_government": sum(1 for e in report.evidence if (e.source_type or "").lower() == "government"),
+                        "source_type_news": sum(1 for e in report.evidence if (e.source_type or "").lower() == "news"),
+                        "source_type_other": 0.0,
+                        "agreement_feature": 1.0,
+                    },
+                    "image_features": {
+                        "image_present": 1 if image_signals else 0,
+                        "mismatch_score": getattr(image_signals, "mismatch_score", 0.0) if image_signals else 0.0,
+                        "best_reuse_similarity": 0.0,
+                        "ocr_present": 1 if getattr(image_signals, "ocr_text", None) else 0,
+                        "ocr_confidence": getattr(image_signals, "ocr_confidence", 0.0) or 0.0,
+                        "quality_flag_tiny_resolution": 0,
+                        "quality_flag_extreme_aspect_ratio": 0,
+                        "quality_flag_heavy_jpeg_compression": 0,
+                        "quality_flag_screenshot_likeness": 0,
+                        "clip_image_embedding": [0.0] * 512,
+                    },
+                }
+            c_list = c_gen.generate(feat_rec, original_verdict=report.verdict)
             report.counterfactuals = c_list
         except Exception as e:
             logger.warning(f"Reasoning layer [counterfactual] failed: {e}")
@@ -325,15 +416,22 @@ def apply_reasoning_to_report(
     if enabled.get("share_advice", True):
         try:
             from trustnet.reasoning.share_advice import determine_share_advice
-            advice, advice_rationale = determine_share_advice(
+            advice, reason_code, advice_rationale = determine_share_advice(
                 verdict=report.verdict,
                 confidence=report.confidence,
                 abstained=report.abstained,
                 conflict=report.conflict,
                 temporal=report.temporal,
+                return_code=True,
             )
             report.share_advice = advice
-            notes.append(f"ShareAdvice: {advice.value} - {advice_rationale}")
+            report.decision = ReportDecision(
+                verdict=report.verdict,
+                evidence_status=report.evidence_status or (EvidenceStatus.SUPPORTED if report.verdict == Verdict.VERIFIED else (EvidenceStatus.CONTRADICTED if report.verdict == Verdict.CONTRADICTED else EvidenceStatus.INSUFFICIENT)),
+                recommended_action=advice,
+                reason_codes=[reason_code],
+            )
+            notes.append(f"ShareAdvice: {advice.value} [{reason_code}] - {advice_rationale}")
         except Exception as e:
             logger.warning(f"Reasoning layer [share_advice] failed: {e}")
 
@@ -349,6 +447,7 @@ def verify_claim(
     enable_reasoning: bool = True,
     reasoning_config: Optional[Any] = None,
     multilingual_config: Optional[Any] = None,
+    search_coverage: Optional[SearchCoverage] = None,
 ) -> ClaimReport:
     """
     Verifies a single Claim instance using calibrated multimodal prediction and abstention,
@@ -412,6 +511,23 @@ def verify_claim(
         image_path=image_path,
     )
 
+    if search_coverage is None:
+        search_coverage = build_search_coverage(evidence or [])
+    report.search_coverage = search_coverage
+
+    # Update evidence_status to reflect search_coverage
+    if search_coverage.passages_above_threshold == 0:
+        report.evidence_status = EvidenceStatus.NO_EVIDENCE_FOUND
+    elif report.verdict == Verdict.VERIFIED:
+        report.evidence_status = EvidenceStatus.SUPPORTED
+    elif report.verdict == Verdict.CONTRADICTED:
+        report.evidence_status = EvidenceStatus.CONTRADICTED
+    else:
+        report.evidence_status = EvidenceStatus.INSUFFICIENT
+
+    if report.abstained and not report.abstain_reason:
+        report.abstain_reason = AbstainReason.BELOW_CONFIDENCE_THRESHOLD
+
     # Ensure report always shows what user wrote and what module used
     report.language_info = claim.language_info
     report.original_text = claim.original_text or claim.text
@@ -419,6 +535,19 @@ def verify_claim(
 
     if enable_reasoning:
         report = apply_reasoning_to_report(report, reasoning_config=reasoning_config)
+    else:
+        if report.decision is None:
+            from trustnet.reasoning.share_advice import determine_share_advice
+            advice, reason_code, _ = determine_share_advice(
+                report.verdict, report.confidence, report.abstained, return_code=True
+            )
+            report.share_advice = advice
+            report.decision = ReportDecision(
+                verdict=report.verdict,
+                evidence_status=report.evidence_status,
+                recommended_action=advice,
+                reason_codes=[reason_code],
+            )
 
     return report
 

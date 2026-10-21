@@ -19,7 +19,7 @@ from scipy.special import softmax
 
 from trustnet.calibration.abstain import Abstainer
 from trustnet.calibration.temperature import TemperatureScaler
-from trustnet.schemas import Claim, ClaimReport, Evidence, Verdict
+from trustnet.schemas import AbstainReason, Claim, ClaimReport, Evidence, EvidenceStatus, Verdict
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,7 @@ class MultimodalPredictor:
         """
         evidence = evidence or []
         if cached_record is not None:
+            active_rec = cached_record
             pred_info = self.predict_record(cached_record, dataset=dataset)
         else:
             # Query model for expected dimension sizes
@@ -242,13 +243,25 @@ class MultimodalPredictor:
                     "clip_image_embedding": [0.0] * clip_dim,
                 },
             }
+            active_rec = rec
             pred_info = self.predict_record(rec, dataset=dataset)
 
         # Verdict assignment: if abstained, set to INSUFFICIENT_EVIDENCE
         if pred_info["abstained"]:
             final_verdict = Verdict.INSUFFICIENT_EVIDENCE
+            abstain_code = AbstainReason.BELOW_CONFIDENCE_THRESHOLD
         else:
             final_verdict = VERDICT_MAP.get(pred_info["predicted_verdict"], Verdict.INSUFFICIENT_EVIDENCE)
+            abstain_code = None
+
+        if not evidence:
+            ev_status = EvidenceStatus.NO_EVIDENCE_FOUND
+        elif final_verdict == Verdict.VERIFIED:
+            ev_status = EvidenceStatus.SUPPORTED
+        elif final_verdict == Verdict.CONTRADICTED:
+            ev_status = EvidenceStatus.CONTRADICTED
+        else:
+            ev_status = EvidenceStatus.INSUFFICIENT
 
         return ClaimReport(
             claim=claim,
@@ -259,6 +272,9 @@ class MultimodalPredictor:
             raw_probabilities=pred_info["raw_probabilities"],
             calibrated_probabilities=pred_info["calibrated_probabilities"],
             abstention_reason=pred_info["abstention_reason"],
+            abstain_reason=abstain_code,
+            evidence_status=ev_status,
+            feature_record=active_rec,
             gaps=["Confidence below threshold; abstained from verdict."] if pred_info["abstained"] else [],
             language_info=getattr(claim, "language_info", None),
             original_text=getattr(claim, "original_text", None) or claim.text,

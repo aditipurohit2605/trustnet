@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
-from trustnet.schemas import ClaimReport, Verdict
+from trustnet.schemas import ClaimReport, SearchCoverage, Verdict
 
 
 class PipelineVariant(str, Enum):
@@ -89,6 +89,10 @@ class ReportEnvelope(BaseModel):
     warnings: List[str] = Field(
         default_factory=list,
         description="Operational warnings generated during analysis (e.g. OCR unreadable, source staleness)."
+    )
+    search_coverage: Optional[SearchCoverage] = Field(
+        default=None,
+        description="Corpus search execution telemetry across the verification pipeline."
     )
 
 

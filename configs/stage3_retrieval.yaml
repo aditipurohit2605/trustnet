@@ -30,3 +30,10 @@ corpus_path: "data/corpus/corpus_v1.jsonl"
 passages_path: "outputs/stage3/passages.jsonl"
 index_dir: "outputs/stage3/index"
 cache_embeddings: true
+
+# Relevance filtering and coverage telemetry
+relevance_threshold: 0.50
+not_searched:
+  - "social_media_archives"
+  - "real_time_web"
+  - "subscription_databases"

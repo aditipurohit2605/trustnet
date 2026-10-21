@@ -175,6 +175,55 @@ class ManipulationTag(BaseModel):
     span: str
 
 
+class EvidenceStatus(str, Enum):
+    """Corpus evidence availability and retrieval outcome for a claim."""
+    SUPPORTED = "supported"
+    CONTRADICTED = "contradicted"
+    INSUFFICIENT = "insufficient"
+    NO_EVIDENCE_FOUND = "no_evidence_found"
+    RETRIEVAL_FAILED = "retrieval_failed"
+
+
+class AbstainReason(str, Enum):
+    """Categorical reason code when the model or policy abstains from definitive verdict."""
+    BELOW_CONFIDENCE_THRESHOLD = "below_confidence_threshold"
+    HIGH_CONFLICT = "high_conflict"
+    STALE_UNCONFIRMED = "stale_unconfirmed"
+    UNRELIABLE_SOURCES = "unreliable_sources"
+    NO_EVIDENCE = "no_evidence"
+    UNCALIBRATED_UNCERTAINTY = "uncalibrated_uncertainty"
+
+
+class GapStatus(str, Enum):
+    """Resolution and search status of an identified evidentiary gap."""
+    OPEN = "open"
+    SEARCHED_NOT_FOUND = "searched_not_found"
+    OUTSIDE_SCOPE = "outside_scope"
+    RESOLVED = "resolved"
+
+
+class SearchCoverage(BaseModel):
+    """Evidentiary search execution telemetry across the knowledge corpus."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    corpus_name: str = "default_corpus"
+    total_documents_indexed: int = 0
+    candidates_retrieved: int = 0
+    passages_above_threshold: int = 0
+    top_score: float = 0.0
+    not_searched: List[str] = Field(default_factory=list)
+
+
+class ReportDecision(BaseModel):
+    """Consolidated actionable decision separating verdict, evidence status, and recommendation."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    verdict: Verdict
+    evidence_status: EvidenceStatus
+    recommended_action: ShareAdvice
+    reason_codes: List[str] = Field(default_factory=list)
+
+
 class Gap(BaseModel):
     """Specific verification gap identified in the evidence base."""
     model_config = ConfigDict(populate_by_name=True)
@@ -182,6 +231,7 @@ class Gap(BaseModel):
     code: str
     description: str
     how_to_check: str
+    status: GapStatus = Field(default=GapStatus.OPEN)
 
 
 class Counterfactual(BaseModel):
@@ -214,7 +264,7 @@ class ClaimReport(BaseModel):
     Complete verification report for a claim, containing evidence items,
     the final verdict, confidence score, and any noted gaps.
     """
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     claim: Claim
     evidence: List[Evidence] = Field(default_factory=list)
@@ -223,8 +273,13 @@ class ClaimReport(BaseModel):
     abstained: bool = Field(default=False, description="Flag indicating if the system abstained from making a definitive verdict.")
     raw_probabilities: Optional[Dict[str, float]] = Field(default=None, description="Uncalibrated model output probability distribution.")
     calibrated_probabilities: Optional[Dict[str, float]] = Field(default=None, description="Calibrated probability distribution for dashboard and reporting.")
-    abstention_reason: Optional[str] = Field(default=None, description="Explanation if system abstains.")
+    abstention_reason: Optional[Union[AbstainReason, str]] = Field(default=None, description="Explanation or code if system abstains.")
+    abstain_reason: Optional[Union[AbstainReason, str]] = Field(default=None, description="Categorical reason code when abstained.")
+    evidence_status: Optional[EvidenceStatus] = Field(default=None, description="Corpus evidence retrieval and corroboration status.")
+    search_coverage: Optional[SearchCoverage] = Field(default=None, description="Corpus search execution telemetry.")
+    decision: Optional[ReportDecision] = Field(default=None, description="Actionable decision separating verdict, evidence status, and recommendation.")
     gaps: List[Gap] = Field(default_factory=list)
+    feature_record: Optional[Dict[str, Any]] = Field(default=None, description="Underlying multimodal feature record for counterfactual generation.")
 
     # Stage 8 Reasoning Layer Extensions
     source_weights: Optional[List[SourceWeight]] = None
@@ -251,13 +306,13 @@ class ClaimReport(BaseModel):
             migrated = []
             for item in v:
                 if isinstance(item, str):
-                    migrated.append(Gap(code="general_note", description=item, how_to_check="Verify claim evidence directly."))
+                    migrated.append(Gap(code="general_note", description=item, how_to_check="Verify claim evidence directly.", status=GapStatus.OPEN))
                 elif isinstance(item, dict):
                     migrated.append(Gap(**item))
                 elif isinstance(item, Gap):
                     migrated.append(item)
                 else:
-                    migrated.append(Gap(code="note", description=str(item), how_to_check="Verify claim evidence directly."))
+                    migrated.append(Gap(code="note", description=str(item), how_to_check="Verify claim evidence directly.", status=GapStatus.OPEN))
             return migrated
         return v
 

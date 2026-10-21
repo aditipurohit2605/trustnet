@@ -22,11 +22,21 @@ import yaml
 from trustnet.api.schemas import PipelineVariant, ReportEnvelope, VerifyOptions
 from trustnet.pipeline import (
     apply_reasoning_to_report,
+    build_search_coverage,
     run_extraction_for_image_text,
     run_retrieval_for_message,
     verify_claim,
 )
-from trustnet.schemas import Claim, ClaimReport, Evidence, ExtractedClaim, ImageSignals
+from trustnet.schemas import (
+    AbstainReason,
+    Claim,
+    ClaimReport,
+    Evidence,
+    EvidenceStatus,
+    ExtractedClaim,
+    ImageSignals,
+    SearchCoverage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -180,27 +190,35 @@ class PipelineRunner:
         t_start = time.perf_counter()
 
         claim_evidence_map: Dict[str, List[Evidence]] = {}
+        claim_coverage_map: Dict[str, SearchCoverage] = {}
+        claim_retrieval_failed: Dict[str, bool] = {}
 
         if variant in ("text_retrieval", "full"):
-            try:
-                retriever = self.registry.get("retriever")
-                for claim in unique_claims:
+            retriever = self.registry.get("retriever")
+            for claim in unique_claims:
+                try:
                     ev_items = retriever.search(
                         claim_text=claim.text,
                         mode="hybrid_rerank" if self.registry.get("reranker") else "hybrid",
                         top_k=5,
                     )
                     claim_evidence_map[claim.id] = ev_items
-            except Exception as e:
-                logger.warning(f"Retriever degraded: {e}")
-                degraded.append("retriever")
-                warnings.append(f"Evidence retrieval failed: {str(e)}; continuing with empty evidence.")
-                for claim in unique_claims:
+                    claim_coverage_map[claim.id] = build_search_coverage(ev_items)
+                    claim_retrieval_failed[claim.id] = False
+                except Exception as e:
+                    logger.warning(f"Retriever degraded for claim {claim.id}: {e}")
+                    if "retriever" not in degraded:
+                        degraded.append("retriever")
+                    warnings.append(f"Evidence retrieval failed: {str(e)}; continuing with empty evidence.")
                     claim_evidence_map[claim.id] = []
+                    claim_coverage_map[claim.id] = build_search_coverage([])
+                    claim_retrieval_failed[claim.id] = True
         else:
             # text_only or text_image variant deliberately skips retrieval
             for claim in unique_claims:
                 claim_evidence_map[claim.id] = []
+                claim_coverage_map[claim.id] = build_search_coverage([])
+                claim_retrieval_failed[claim.id] = False
 
         timings["evidence_retrieval"] = round(time.perf_counter() - t_start, 4)
 
@@ -214,6 +232,8 @@ class PipelineRunner:
 
         for claim in unique_claims:
             ev = claim_evidence_map.get(claim.id, [])
+            cov = claim_coverage_map.get(claim.id)
+            is_retrieval_failed = claim_retrieval_failed.get(claim.id, False)
             try:
                 # Use image_path only if variant includes images
                 active_image_path = image_path if variant in ("text_image", "full") else None
@@ -223,7 +243,10 @@ class PipelineRunner:
                     image_path=active_image_path,
                     predictor=predictor,
                     enable_reasoning=False,  # Reasoning executed separately in Stage 4 for granular timing
+                    search_coverage=cov,
                 )
+                if is_retrieval_failed:
+                    report.evidence_status = EvidenceStatus.RETRIEVAL_FAILED
                 reports.append(report)
             except Exception as e:
                 logger.warning(f"Prediction failed for claim {claim.id}: {e}")
@@ -238,6 +261,9 @@ class PipelineRunner:
                     confidence=0.3333,
                     abstained=True,
                     abstention_reason=f"Prediction degraded due to component error: {e}",
+                    abstain_reason=AbstainReason.BELOW_CONFIDENCE_THRESHOLD,
+                    evidence_status=EvidenceStatus.RETRIEVAL_FAILED if is_retrieval_failed else (EvidenceStatus.NO_EVIDENCE_FOUND if (cov and cov.passages_above_threshold == 0) else EvidenceStatus.INSUFFICIENT),
+                    search_coverage=cov or build_search_coverage([]),
                 )
                 reports.append(fallback_report)
 
@@ -287,6 +313,10 @@ class PipelineRunner:
             "ocr": "easyocr_multilingual",
         }
 
+        envelope_coverage = (
+            reports[0].search_coverage if (reports and reports[0].search_coverage) else build_search_coverage([])
+        )
+
         envelope = ReportEnvelope(
             report_id=report_id,
             pipeline_version=self.pipeline_version,
@@ -298,6 +328,7 @@ class PipelineRunner:
             claims=reports,
             original_text=text,
             warnings=warnings,
+            search_coverage=envelope_coverage,
         )
 
         _update_progress("done", 1.0)

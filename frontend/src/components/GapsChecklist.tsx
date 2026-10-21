@@ -32,8 +32,8 @@ export const GapsChecklist: React.FC<GapsChecklistProps> = ({ gaps = [] }) => {
           </svg>
           <span>{t.reportPage.gapsTitle}</span>
         </h4>
-        <span className="text-[11px] text-slate-500">
-          {Object.values(checkedItems).filter(Boolean).length} / {gaps.length} investigated
+        <span className="text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+          {gaps.length} {gaps.length === 1 ? 'gap' : 'gaps'}
         </span>
       </div>
 
@@ -70,9 +70,20 @@ export const GapsChecklist: React.FC<GapsChecklistProps> = ({ gaps = [] }) => {
                         : 'text-slate-900 dark:text-slate-100'
                     }`}
                   >
-                    <span className="font-mono text-[10px] px-1.5 py-0.5 mr-2 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                    <span className="font-mono text-[10px] px-1.5 py-0.5 mr-1.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                       {gap.code}
                     </span>
+                    {(gap as any).status && (
+                      <span className={`text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 mr-2 rounded ${
+                        (gap as any).status === 'searched_not_found'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                          : (gap as any).status === 'outside_scope'
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                      }`}>
+                        {String((gap as any).status).replace(/_/g, ' ')}
+                      </span>
+                    )}
                     {gap.description}
                   </label>
                   {gap.how_to_check && (

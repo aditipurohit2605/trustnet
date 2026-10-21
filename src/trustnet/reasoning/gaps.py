@@ -23,7 +23,16 @@ from typing import Any, Dict, List, Optional, Set, Union
 
 import yaml
 
-from trustnet.schemas import ConflictInfo, Evidence, Gap, ImageSignals, SourceMention, TemporalInfo
+from trustnet.schemas import (
+    ConflictInfo,
+    Evidence,
+    Gap,
+    GapStatus,
+    ImageSignals,
+    SearchCoverage,
+    SourceMention,
+    TemporalInfo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +143,8 @@ class GapAnalyzer:
         temporal_info: Optional[TemporalInfo] = None,
         image_signals: Optional[ImageSignals] = None,
         source_mentions: Optional[List[SourceMention]] = None,
+        search_coverage: Optional[SearchCoverage] = None,
+        search_ran: Optional[bool] = None,
     ) -> List[Gap]:
         """
         Runs comprehensive rule-based gap analysis.
@@ -214,11 +225,29 @@ class GapAnalyzer:
             if max_score < self.retrieval_score_threshold:
                 triggered_codes.add("low_retrieval_scores")
 
-        # Assemble Gap objects from templates
+        # Determine whether corpus retrieval actually ran
+        if search_ran is not None:
+            corpus_searched = search_ran
+        elif search_coverage is not None:
+            corpus_searched = (search_coverage.total_documents_indexed > 0 or search_coverage.candidates_retrieved > 0)
+        else:
+            corpus_searched = len(evidence_list) > 0
+
+        # Assemble Gap objects from templates with appropriate GapStatus
         for code in sorted(list(triggered_codes)):
             tmpl = self.templates.get(code, {})
             desc = tmpl.get("description", f"Identified verification gap: {code}")
             check = tmpl.get("how_to_check", "Conduct independent verification across primary public records.")
-            gaps.append(Gap(code=code, description=desc, how_to_check=check))
+
+            if code in ("low_retrieval_scores", "no_primary_source", "no_dated_evidence", "no_location_confirmation"):
+                status = GapStatus.SEARCHED_NOT_FOUND if corpus_searched else GapStatus.OPEN
+            elif code == "source_unnamed":
+                status = GapStatus.OUTSIDE_SCOPE
+            elif code == "image_origin_unknown":
+                status = GapStatus.SEARCHED_NOT_FOUND if (image_signals and len(image_signals.reuse_matches) == 0 and corpus_searched) else GapStatus.OPEN
+            else:
+                status = GapStatus.OPEN
+
+            gaps.append(Gap(code=code, description=desc, how_to_check=check, status=status))
 
         return gaps
