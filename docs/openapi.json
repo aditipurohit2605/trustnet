@@ -1,0 +1,1394 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TrustNet Verification API",
+    "description": "Production-grade multimodal factual claim verification API. Features asynchronous queueing, probability calibration, selective abstention, and multi-factor reasoning.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/verify": {
+      "post": {
+        "summary": "Submit Verification",
+        "description": "Ingests verification request, sanitizes inputs, enforces security constraints,\nand enqueues the job into the single-worker pipeline queue.",
+        "operationId": "submit_verification_v1_verify_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_submit_verification_v1_verify_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}": {
+      "get": {
+        "summary": "Get Job Status",
+        "description": "Retrieves current execution status, progress, and completed report if available.",
+        "operationId": "get_job_status_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reports/{report_id}": {
+      "get": {
+        "summary": "Get Report",
+        "description": "Retrieves full verification report envelope including evidence, timings, and reasoning notes.",
+        "operationId": "get_report_v1_reports__report_id__get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Report",
+        "description": "Deletes stored verification report and cleans up any linked database records.",
+        "operationId": "delete_report_v1_reports__report_id__delete",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/feedback": {
+      "post": {
+        "summary": "Submit Feedback",
+        "description": "Submits user audit feedback on a generated report with mandatory consent verification.",
+        "operationId": "submit_feedback_v1_feedback_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "System liveness and readiness probe for Docker / Kubernetes health checking.",
+        "operationId": "health_check_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/memory": {
+      "get": {
+        "summary": "Get Memory Stats",
+        "description": "Returns granular per-model and global GPU/CPU memory metrics.",
+        "operationId": "get_memory_stats_v1_memory_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_submit_verification_v1_verify_post": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "title": "Body_submit_verification_v1_verify_post"
+      },
+      "Claim": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "language_info": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LanguageInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "original_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Text"
+          },
+          "normalized_text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NormalizedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "Claim",
+        "description": "Represents a factual claim to be verified."
+      },
+      "ClaimReport": {
+        "properties": {
+          "claim": {
+            "$ref": "#/components/schemas/Claim"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "Confidence must be between 0 and 1."
+          },
+          "abstained": {
+            "type": "boolean",
+            "title": "Abstained",
+            "description": "Flag indicating if the system abstained from making a definitive verdict.",
+            "default": false
+          },
+          "raw_probabilities": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Probabilities",
+            "description": "Uncalibrated model output probability distribution."
+          },
+          "calibrated_probabilities": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibrated Probabilities",
+            "description": "Calibrated probability distribution for dashboard and reporting."
+          },
+          "abstention_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abstention Reason",
+            "description": "Explanation if system abstains."
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "source_weights": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SourceWeight"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Weights"
+          },
+          "conflict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "temporal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TemporalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "manipulation": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ManipulationTag"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manipulation"
+          },
+          "counterfactuals": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Counterfactual"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterfactuals"
+          },
+          "share_advice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShareAdvice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reasoning_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Notes"
+          },
+          "language_info": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LanguageInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "original_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Text"
+          },
+          "normalized_text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NormalizedText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim",
+          "verdict",
+          "confidence"
+        ],
+        "title": "ClaimReport",
+        "description": "Complete verification report for a claim, containing evidence items,\nthe final verdict, confidence score, and any noted gaps."
+      },
+      "ConflictInfo": {
+        "properties": {
+          "has_conflict": {
+            "type": "boolean",
+            "title": "Has Conflict",
+            "default": false
+          },
+          "supporting": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Supporting"
+          },
+          "contradicting": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Contradicting"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ConflictInfo",
+        "description": "Detection of contradictory or conflicting evidence across authoritative sources."
+      },
+      "Counterfactual": {
+        "properties": {
+          "change_description": {
+            "type": "string",
+            "title": "Change Description"
+          },
+          "original_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Original Verdict"
+          },
+          "new_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "New Verdict"
+          },
+          "flipped": {
+            "type": "boolean",
+            "title": "Flipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "change_description",
+          "original_verdict",
+          "new_verdict",
+          "flipped"
+        ],
+        "title": "Counterfactual",
+        "description": "Hypothetical input perturbation scenario testing model decision sensitivity."
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Machine-readable error classification code (e.g. INVALID_IMAGE, RATE_LIMITED)."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable explanation of why the request failed."
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "Unique request tracing ID matching the X-Request-ID response header."
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse",
+        "description": "Consistent JSON error response structure returned across all 4xx and 5xx errors."
+      },
+      "Evidence": {
+        "properties": {
+          "doc_id": {
+            "type": "string",
+            "title": "Doc Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "passage_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage Id"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doc_id",
+          "text"
+        ],
+        "title": "Evidence",
+        "description": "Represents an evidence document or snippet supporting/refuting a claim."
+      },
+      "FeedbackIn": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "title": "Report Id",
+            "description": "ID of the report to which this feedback pertains."
+          },
+          "claim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Id",
+            "description": "Optional specific claim ID within the report."
+          },
+          "suggested_verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Verdict",
+            "description": "User suggested verdict (e.g. verified, contradicted, insufficient_evidence)."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "Free-form user comment explaining the feedback (max 2000 chars)."
+          },
+          "consent_to_store": {
+            "type": "boolean",
+            "title": "Consent To Store",
+            "description": "Explicit user consent to store feedback. If False, feedback is discarded immediately."
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "consent_to_store"
+        ],
+        "title": "FeedbackIn",
+        "description": "User feedback submission on a generated claim report.\nGuaranteed: feedback is never automatically used for training or threshold adjustments."
+      },
+      "Gap": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "how_to_check": {
+            "type": "string",
+            "title": "How To Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "description",
+          "how_to_check"
+        ],
+        "title": "Gap",
+        "description": "Specific verification gap identified in the evidence base."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JobResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Unique job identifier."
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Current job lifecycle status."
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage",
+            "description": "Current executing pipeline stage name."
+          },
+          "progress": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "description": "Progress estimate between 0.0 (queued) and 1.0 (completed).",
+            "default": 0.0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "UTC timestamp when the job was accepted into the queue."
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportEnvelope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Completed verification report envelope, populated when status == DONE."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error details if the job failed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "JobResponse",
+        "description": "Status inquiry response for a queued or executing verification job."
+      },
+      "JobStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "JobStatus",
+        "description": "Lifecycle states for background verification jobs."
+      },
+      "LanguageInfo": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "script": {
+            "type": "string",
+            "title": "Script"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "default": 1.0
+          },
+          "is_code_mixed": {
+            "type": "boolean",
+            "title": "Is Code Mixed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "script"
+        ],
+        "title": "LanguageInfo",
+        "description": "Detected language and script metadata for multilingual text processing."
+      },
+      "ManipulationTag": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "span": {
+            "type": "string",
+            "title": "Span"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "confidence",
+          "span"
+        ],
+        "title": "ManipulationTag",
+        "description": "Tagging of psychological, rhetorical, or manipulative tactics in message text."
+      },
+      "NormalizedText": {
+        "properties": {
+          "original": {
+            "type": "string",
+            "title": "Original"
+          },
+          "normalized": {
+            "type": "string",
+            "title": "Normalized"
+          },
+          "translated_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translated En"
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "original",
+          "normalized"
+        ],
+        "title": "NormalizedText",
+        "description": "Structured record tracking text normalization, transliteration, and translation."
+      },
+      "ReportEnvelope": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "title": "Report Id",
+            "description": "Unique report identifier (UUID)."
+          },
+          "pipeline_version": {
+            "type": "string",
+            "title": "Pipeline Version",
+            "description": "Git commit hash or package release version of the running code."
+          },
+          "model_versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Model Versions",
+            "description": "Dictionary mapping component names (text, retriever, fusion, etc.) to model identifiers or hashes."
+          },
+          "config_hash": {
+            "type": "string",
+            "title": "Config Hash",
+            "description": "SHA-256 fingerprint of the pipeline configuration active during execution."
+          },
+          "variant": {
+            "type": "string",
+            "title": "Variant",
+            "description": "Verification pipeline variant that was executed."
+          },
+          "timings": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Timings",
+            "description": "Per-stage latency measurements in seconds (e.g. extraction, retrieval, fusion, reasoning)."
+          },
+          "degraded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Degraded",
+            "description": "List of component names that failed or were skipped gracefully during execution."
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimReport"
+            },
+            "type": "array",
+            "title": "Claims",
+            "description": "List of verified claim reports produced by the pipeline."
+          },
+          "original_text": {
+            "type": "string",
+            "title": "Original Text",
+            "description": "Original user-submitted message text."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Operational warnings generated during analysis (e.g. OCR unreadable, source staleness)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "pipeline_version",
+          "config_hash",
+          "variant",
+          "original_text"
+        ],
+        "title": "ReportEnvelope",
+        "description": "Standard envelope wrapping verification results with provenance, execution timings,\nmodel version identifiers, and degradation telemetry."
+      },
+      "ShareAdvice": {
+        "type": "string",
+        "enum": [
+          "safe_to_share",
+          "share_with_caution",
+          "do_not_share_as_confirmed"
+        ],
+        "title": "ShareAdvice",
+        "description": "Actionable sharing advice derived from reasoning, calibration, and conflict signals."
+      },
+      "SourceWeight": {
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_type",
+          "weight"
+        ],
+        "title": "SourceWeight",
+        "description": "Reliability weighting attribution for an evidence source type."
+      },
+      "TemporalInfo": {
+        "properties": {
+          "claim_time_expressions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Claim Time Expressions"
+          },
+          "newest_evidence_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newest Evidence Date"
+          },
+          "oldest_evidence_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Evidence Date"
+          },
+          "is_stale": {
+            "type": "boolean",
+            "title": "Is Stale",
+            "default": false
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "TemporalInfo",
+        "description": "Temporal freshness analysis and staleness flags comparing claim to evidence."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "verified",
+          "contradicted",
+          "insufficient_evidence",
+          "insufficient_evidence"
+        ],
+        "title": "Verdict",
+        "description": "Standard verdict labels for claim verification.\nInherits from str for seamless serialization and string comparison."
+      }
+    }
+  }
+}

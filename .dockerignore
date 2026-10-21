@@ -1,0 +1,34 @@
+# Exclude virtual environments
+.venv/
+venv/
+env/
+
+# Exclude git repository data
+.git/
+.gitignore
+
+# Exclude large local data and model artifacts (mount these via volumes instead)
+data/
+outputs/
+*.npy
+*.pkl
+*.faiss
+*.pt
+*.bin
+*.safetensors
+
+# Exclude bytecode, caches, and test artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Exclude developer environment and secret files
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/

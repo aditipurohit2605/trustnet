@@ -1,0 +1,45 @@
+# TrustNet Stage 10 Backend API Configuration
+#
+# SECURITY MANDATE:
+# Secrets and API credentials MUST NEVER be stored in this file.
+# API keys are read strictly from the environment variable designated by `api_keys_env_var`.
+
+# Network & Server Binding
+host: "0.0.0.0"
+port: 8000
+log_level: "INFO"
+
+# Input Validation Limits
+max_text_chars: 10000            # Maximum permissible length for raw input message text
+max_image_bytes: 10485760        # 10 MB maximum image upload payload size
+max_image_pixels: 25000000       # 25 Megapixels (prevents PIL decompression bomb attacks)
+max_claims_per_message: 10       # Bounded upper limit of claims extracted per submission
+allowed_image_types:
+  - "image/jpeg"
+  - "image/png"
+  - "image/webp"
+
+# Job Queue & Execution Constraints
+job_timeout_seconds: 120         # Maximum execution duration before a job is aborted and marked failed
+queue_max_size: 50               # Maximum queued jobs before HTTP 429 is returned
+single_worker: true              # Strict constraint: exactly one GPU worker to avoid VRAM thrashing
+
+# Storage & Retention
+db_path: "outputs/stage10/trustnet_api.db"
+retention_days: 30               # Data lifecycle policy: delete reports and feedback older than 30 days
+allow_store_image: false         # Disallow image retention by default to respect user privacy
+
+# Security & Access Control
+api_keys_env_var: "TRUSTNET_API_KEYS"  # Env var containing comma-separated valid API keys
+rate_limit_per_minute: 60              # Per-client sliding window request throttle
+cors_origins:
+  - "http://localhost:3000"
+  - "http://localhost:8000"
+  - "http://127.0.0.1:8000"
+
+# Model Lifecycle & Hardware Management
+lazy_models:
+  - "translator"
+  - "captioner"
+lazy_idle_timeout_seconds: 60    # Idle duration before lazy models are unloaded from VRAM
+ollama_keep_alive: "5m"          # Keep-alive window for optional Ollama endpoints
