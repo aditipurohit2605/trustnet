@@ -48,11 +48,12 @@ def extract_mlp_logits(
     loader = DataLoader(ds, batch_size=trainer.batch_size, shuffle=False)
     all_logits = []
 
+    device = next(trainer.model.parameters()).device if hasattr(trainer.model, "parameters") else trainer.device
     with torch.no_grad():
         for batch in loader:
-            compact = batch["compact"].to(trainer.device)
-            clip = batch["clip"].to(trainer.device)
-            text_pooled = batch["text_pooled"].to(trainer.device)
+            compact = batch["compact"].to(device)
+            clip = batch["clip"].to(device)
+            text_pooled = batch["text_pooled"].to(device)
 
             logits = trainer.model(compact, clip, text_pooled)
             all_logits.append(logits.cpu().numpy())
